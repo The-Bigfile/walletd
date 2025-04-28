@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/types"
 	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/types"
 )
 
 // A StateResponse returns information about the current state of the walletd

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"go.sia.tech/core/types"
 	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/types"
 )
 
 // SiacoinElement returns an unspent Siacoin UTXO by its ID.

@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"syscall"
 
-	"go.sia.tech/core/types"
+	"go.thebigfile.com/core/types"
 	"go.sia.tech/walletd/v2/api"
 	"go.sia.tech/walletd/v2/build"
 	"go.sia.tech/walletd/v2/config"

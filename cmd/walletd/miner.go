@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"time"
 
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils"
 	"go.sia.tech/walletd/v2/api"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils"
 	"lukechampine.com/frand"
 )
 

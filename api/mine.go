@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"go.sia.tech/core/types"
+	"go.thebigfile.com/core/types"
 )
 
 // mineBlock constructs a block from the provided address and the transactions

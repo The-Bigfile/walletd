@@ -13,13 +13,13 @@ import (
 	"go.sia.tech/jape"
 	"go.uber.org/zap"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/gateway"
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/chain"
-	"go.sia.tech/coreutils/syncer"
 	"go.sia.tech/walletd/v2/build"
 	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/gateway"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/chain"
+	"go.thebigfile.com/coreutils/syncer"
 )
 
 // A ServerOption sets an optional parameter for the server.

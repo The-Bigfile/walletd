@@ -7,8 +7,8 @@ import (
 	"math/bits"
 	"time"
 
-	"go.sia.tech/core/types"
 	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/types"
 )
 
 func (s *Store) getWalletEventRelevantAddresses(tx *txn, id wallet.ID, eventIDs []int64) (map[int64][]types.Address, error) {

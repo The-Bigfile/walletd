@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/chain"
 	"go.sia.tech/jape"
 	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/chain"
 )
 
 // A Client provides methods for interacting with a walletd API server.

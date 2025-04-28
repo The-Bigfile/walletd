@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/wallet"
 )
 
 // event types indicate the source of an event. Events can

@@ -4,12 +4,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils"
-	"go.sia.tech/coreutils/chain"
-	"go.sia.tech/coreutils/testutil"
 	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils"
+	"go.thebigfile.com/coreutils/chain"
+	"go.thebigfile.com/coreutils/testutil"
 	"go.uber.org/zap/zaptest"
 )
 

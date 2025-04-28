@@ -3,8 +3,8 @@ package wallet
 import (
 	"fmt"
 
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/chain"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/chain"
 	"go.uber.org/zap"
 )
 

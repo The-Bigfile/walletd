@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.sia.tech/core/types"
+	"go.thebigfile.com/core/types"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )

@@ -3,7 +3,7 @@ package wallet
 import (
 	"time"
 
-	"go.sia.tech/core/types"
+	"go.thebigfile.com/core/types"
 )
 
 // AddressBalance returns the balance of a single address.

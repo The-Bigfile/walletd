@@ -1,9 +1,9 @@
 package api_test
 
 import (
-	"go.sia.tech/core/types"
 	"go.sia.tech/walletd/v2/api"
 	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/types"
 )
 
 func ExampleWalletClient_Construct() {

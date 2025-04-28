@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/chain"
 	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/chain"
 	"go.uber.org/zap"
 )
 
