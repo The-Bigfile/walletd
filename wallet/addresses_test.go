@@ -3,9 +3,9 @@ package wallet_test
 import (
 	"testing"
 
-	"go.sia.tech/walletd/v2/internal/testutil"
-	"go.sia.tech/walletd/v2/wallet"
 	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/walletd/v2/internal/testutil"
+	"go.thebigfile.com/walletd/v2/wallet"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -18,8 +18,8 @@ func TestAddressUseTpool(t *testing.T) {
 	addr1 := uc.UnlockHash()
 
 	network, genesisBlock := testutil.V2Network()
-	genesisBlock.Transactions[0].SiacoinOutputs = []types.SiacoinOutput{
-		{Address: addr1, Value: types.Siacoins(100)},
+	genesisBlock.Transactions[0].BigFileOutputs = []types.BigFileOutput{
+		{Address: addr1, Value: types.BigFiles(100)},
 	}
 	cn := testutil.NewConsensusNode(t, network, genesisBlock, log)
 	cm := cn.Chain
@@ -33,39 +33,39 @@ func TestAddressUseTpool(t *testing.T) {
 
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
-	assertSiacoinElement := func(t *testing.T, id types.SiacoinOutputID, value types.Currency, confirmations uint64) {
+	assertBigFileElement := func(t *testing.T, id types.BigFileOutputID, value types.Currency, confirmations uint64) {
 		t.Helper()
 
-		utxos, _, err := wm.AddressSiacoinOutputs(addr1, true, 0, 1)
+		utxos, _, err := wm.AddressBigFileOutputs(addr1, true, 0, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, sce := range utxos {
 			if sce.ID == id {
-				if !sce.SiacoinOutput.Value.Equals(value) {
-					t.Fatalf("expected value %v, got %v", value, sce.SiacoinOutput.Value)
+				if !sce.BigFileOutput.Value.Equals(value) {
+					t.Fatalf("expected value %v, got %v", value, sce.BigFileOutput.Value)
 				} else if sce.Confirmations != confirmations {
 					t.Fatalf("expected confirmations %d, got %d", confirmations, sce.Confirmations)
 				}
 				return
 			}
 		}
-		t.Fatalf("expected siacoin element with ID %q not found", id)
+		t.Fatalf("expected bigfile element with ID %q not found", id)
 	}
 
-	airdropID := genesisBlock.Transactions[0].SiacoinOutputID(0)
-	assertSiacoinElement(t, airdropID, types.Siacoins(100), 2)
+	airdropID := genesisBlock.Transactions[0].BigFileOutputID(0)
+	assertBigFileElement(t, airdropID, types.BigFiles(100), 2)
 
-	utxos, basis, err := wm.AddressSiacoinOutputs(addr1, true, 0, 100)
+	utxos, basis, err := wm.AddressBigFileOutputs(addr1, true, 0, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	cs := cm.TipState()
 	txn := types.V2Transaction{
-		SiacoinInputs: []types.V2SiacoinInput{
+		BigFileInputs: []types.V2BigFileInput{
 			{
-				Parent: utxos[0].SiacoinElement,
+				Parent: utxos[0].BigFileElement,
 				SatisfiedPolicy: types.SatisfiedPolicy{
 					Policy: types.SpendPolicy{
 						Type: types.PolicyTypeUnlockConditions(uc),
@@ -73,19 +73,19 @@ func TestAddressUseTpool(t *testing.T) {
 				},
 			},
 		},
-		SiacoinOutputs: []types.SiacoinOutput{
+		BigFileOutputs: []types.BigFileOutput{
 			{
 				Address: types.VoidAddress,
-				Value:   types.Siacoins(25),
+				Value:   types.BigFiles(25),
 			},
 			{
 				Address: addr1,
-				Value:   types.Siacoins(75),
+				Value:   types.BigFiles(75),
 			},
 		},
 	}
 	sigHash := cs.InputSigHash(txn)
-	txn.SiacoinInputs[0].SatisfiedPolicy.Signatures = []types.Signature{
+	txn.BigFileInputs[0].SatisfiedPolicy.Signatures = []types.Signature{
 		pk.SignHash(sigHash),
 	}
 
@@ -93,7 +93,7 @@ func TestAddressUseTpool(t *testing.T) {
 		t.Fatal(err)
 	}
 	wm.SyncPool() // force reindexing of the tpool
-	assertSiacoinElement(t, txn.SiacoinOutputID(txn.ID(), 1), types.Siacoins(75), 0)
+	assertBigFileElement(t, txn.BigFileOutputID(txn.ID(), 1), types.BigFiles(75), 0)
 	cn.MineBlocks(t, types.VoidAddress, 1)
-	assertSiacoinElement(t, txn.SiacoinOutputID(txn.ID(), 1), types.Siacoins(75), 1)
+	assertBigFileElement(t, txn.BigFileOutputID(txn.ID(), 1), types.BigFiles(75), 1)
 }

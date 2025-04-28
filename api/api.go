@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"go.sia.tech/walletd/v2/wallet"
 	"go.thebigfile.com/core/consensus"
 	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/walletd/v2/wallet"
 )
 
 // A StateResponse returns information about the current state of the walletd
@@ -67,7 +67,7 @@ type BalanceResponse wallet.Balance
 
 // WalletReserveRequest is the request type for /wallets/:id/reserve.
 type WalletReserveRequest struct {
-	SiacoinOutputs []types.SiacoinOutputID `json:"siacoinOutputs"`
+	BigFileOutputs []types.BigFileOutputID `json:"bigfileOutputs"`
 	SiafundOutputs []types.SiafundOutputID `json:"siafundOutputs"`
 }
 
@@ -80,7 +80,7 @@ type WalletUpdateRequest struct {
 
 // WalletReleaseRequest is the request type for /wallets/:id/release.
 type WalletReleaseRequest struct {
-	SiacoinOutputs []types.SiacoinOutputID `json:"siacoinOutputs"`
+	BigFileOutputs []types.BigFileOutputID `json:"bigfileOutputs"`
 	SiafundOutputs []types.SiafundOutputID `json:"siafundOutputs"`
 }
 
@@ -109,7 +109,7 @@ type WalletFundResponse struct {
 
 // WalletConstructRequest is the request type for /wallets/:id/construct.
 type WalletConstructRequest struct {
-	Siacoins      []types.SiacoinOutput `json:"siacoins"`
+	BigFiles      []types.BigFileOutput `json:"bigfiles"`
 	Siafunds      []types.SiafundOutput `json:"siafunds"`
 	ChangeAddress types.Address         `json:"changeAddress"`
 }
@@ -177,11 +177,11 @@ type DebugMineRequest struct {
 	Address types.Address `json:"address"`
 }
 
-// SiacoinElementsResponse is the response type for any endpoint that returns
-// siacoin UTXOs
-type SiacoinElementsResponse struct {
+// BigFileElementsResponse is the response type for any endpoint that returns
+// bigfile UTXOs
+type BigFileElementsResponse struct {
 	Basis   types.ChainIndex       `json:"basis"`
-	Outputs []types.SiacoinElement `json:"outputs"`
+	Outputs []types.BigFileElement `json:"outputs"`
 }
 
 // SiafundElementsResponse is the response type for any endpoint that returns
@@ -191,11 +191,11 @@ type SiafundElementsResponse struct {
 	Outputs []types.SiafundElement `json:"outputs"`
 }
 
-// UnspentSiacoinElementsResponse is the response type for any endpoint that returns
-// siacoin UTXOs
-type UnspentSiacoinElementsResponse struct {
+// UnspentBigFileElementsResponse is the response type for any endpoint that returns
+// bigfile UTXOs
+type UnspentBigFileElementsResponse struct {
 	Basis   types.ChainIndex               `json:"basis"`
-	Outputs []wallet.UnspentSiacoinElement `json:"outputs"`
+	Outputs []wallet.UnspentBigFileElement `json:"outputs"`
 }
 
 // UnspentSiafundElementsResponse is the response type for any endpoint that returns
@@ -205,11 +205,11 @@ type UnspentSiafundElementsResponse struct {
 	Outputs []wallet.UnspentSiafundElement `json:"outputs"`
 }
 
-// AddressSiacoinElementsResponse is the response type for any endpoint that returns
-// siacoin UTXOs
-type AddressSiacoinElementsResponse struct {
+// AddressBigFileElementsResponse is the response type for any endpoint that returns
+// bigfile UTXOs
+type AddressBigFileElementsResponse struct {
 	Basis   types.ChainIndex               `json:"basis"`
-	Outputs []wallet.UnspentSiacoinElement `json:"outputs"`
+	Outputs []wallet.UnspentBigFileElement `json:"outputs"`
 }
 
 // AddressSiafundElementsResponse is the response type for any endpoint that returns
@@ -219,7 +219,7 @@ type AddressSiafundElementsResponse struct {
 	Outputs []wallet.UnspentSiafundElement `json:"outputs"`
 }
 
-// ElementSpentResponse is the response type for /outputs/siacoin/:id/spent and
+// ElementSpentResponse is the response type for /outputs/bigfile/:id/spent and
 // /outputs/siafund/:id/spent.
 type ElementSpentResponse struct {
 	Spent bool          `json:"spent"`

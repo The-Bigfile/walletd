@@ -17,7 +17,7 @@ func mineBlock(ctx context.Context, cm ChainManager, addr types.Address) (types.
 	b := types.Block{
 		ParentID:  cs.Index.ID,
 		Timestamp: types.CurrentTimestamp(),
-		MinerPayouts: []types.SiacoinOutput{{
+		MinerPayouts: []types.BigFileOutput{{
 			Value:   cs.BlockReward(),
 			Address: addr,
 		}},

@@ -13,13 +13,13 @@ import (
 	"go.sia.tech/jape"
 	"go.uber.org/zap"
 
-	"go.sia.tech/walletd/v2/build"
-	"go.sia.tech/walletd/v2/wallet"
 	"go.thebigfile.com/core/consensus"
 	"go.thebigfile.com/core/gateway"
 	"go.thebigfile.com/core/types"
 	"go.thebigfile.com/coreutils/chain"
 	"go.thebigfile.com/coreutils/syncer"
+	"go.thebigfile.com/walletd/v2/build"
+	"go.thebigfile.com/walletd/v2/wallet"
 )
 
 // A ServerOption sets an optional parameter for the server.
@@ -103,27 +103,27 @@ type (
 		WalletAddress(wallet.ID, types.Address) (wallet.Address, error)
 		WalletEvents(id wallet.ID, offset, limit int) ([]wallet.Event, error)
 		WalletUnconfirmedEvents(id wallet.ID) ([]wallet.Event, error)
-		SelectSiacoinElements(walletID wallet.ID, amount types.Currency, useUnconfirmed bool) ([]types.SiacoinElement, types.ChainIndex, types.Currency, error)
+		SelectBigFileElements(walletID wallet.ID, amount types.Currency, useUnconfirmed bool) ([]types.BigFileElement, types.ChainIndex, types.Currency, error)
 		SelectSiafundElements(walletID wallet.ID, amount uint64) ([]types.SiafundElement, types.ChainIndex, uint64, error)
-		UnspentSiacoinOutputs(id wallet.ID, offset, limit int) ([]types.SiacoinElement, types.ChainIndex, error)
+		UnspentBigFileOutputs(id wallet.ID, offset, limit int) ([]types.BigFileElement, types.ChainIndex, error)
 		UnspentSiafundOutputs(id wallet.ID, offset, limit int) ([]types.SiafundElement, types.ChainIndex, error)
 		WalletBalance(id wallet.ID) (wallet.Balance, error)
 
 		AddressBalance(address types.Address) (wallet.Balance, error)
 		AddressEvents(address types.Address, offset, limit int) ([]wallet.Event, error)
 		AddressUnconfirmedEvents(address types.Address) ([]wallet.Event, error)
-		AddressSiacoinOutputs(address types.Address, tpool bool, offset, limit int) ([]wallet.UnspentSiacoinElement, types.ChainIndex, error)
+		AddressBigFileOutputs(address types.Address, tpool bool, offset, limit int) ([]wallet.UnspentBigFileElement, types.ChainIndex, error)
 		AddressSiafundOutputs(address types.Address, tpool bool, offset, limit int) ([]wallet.UnspentSiafundElement, types.ChainIndex, error)
 
 		Events(eventIDs []types.Hash256) ([]wallet.Event, error)
 
-		SiacoinElement(types.SiacoinOutputID) (types.SiacoinElement, error)
+		BigFileElement(types.BigFileOutputID) (types.BigFileElement, error)
 		SiafundElement(types.SiafundOutputID) (types.SiafundElement, error)
-		// SiacoinElementSpentEvent returns the event of a spent siacoin element.
+		// BigFileElementSpentEvent returns the event of a spent bigfile element.
 		// If the element is not spent, the return value will be (Event{}, false, nil).
 		// If the element is not found, the error will be ErrNotFound. An element
 		// is only tracked for 144 blocks after it is spent.
-		SiacoinElementSpentEvent(types.SiacoinOutputID) (wallet.Event, bool, error)
+		BigFileElementSpentEvent(types.BigFileOutputID) (wallet.Event, bool, error)
 		// SiafundElementSpentEvent returns the event of a spent siafund element.
 		// If the element is not spent, the second return value will be (Event{}, false, nil).
 		// If the element is not found, the error will be ErrNotFound. An element
@@ -575,7 +575,7 @@ func (s *server) walletsEventsUnconfirmedHandlerGET(jc jape.Context) {
 	jc.Encode(events)
 }
 
-func (s *server) walletsOutputsSiacoinHandler(jc jape.Context) {
+func (s *server) walletsOutputsBigFileHandler(jc jape.Context) {
 	var id wallet.ID
 	if jc.DecodeParam("id", &id) != nil {
 		return
@@ -586,12 +586,12 @@ func (s *server) walletsOutputsSiacoinHandler(jc jape.Context) {
 		return
 	}
 
-	scos, basis, err := s.wm.UnspentSiacoinOutputs(id, offset, limit)
-	if jc.Check("couldn't load siacoin outputs", err) != nil {
+	scos, basis, err := s.wm.UnspentBigFileOutputs(id, offset, limit)
+	if jc.Check("couldn't load bigfile outputs", err) != nil {
 		return
 	}
 
-	jc.Encode(SiacoinElementsResponse{
+	jc.Encode(BigFileElementsResponse{
 		Basis:   basis,
 		Outputs: scos,
 	})
@@ -609,7 +609,7 @@ func (s *server) walletsOutputsSiafundHandler(jc jape.Context) {
 	}
 
 	sfos, basis, err := s.wm.UnspentSiafundOutputs(id, offset, limit)
-	if jc.Check("couldn't load siacoin outputs", err) != nil {
+	if jc.Check("couldn't load bigfile outputs", err) != nil {
 		return
 	}
 	jc.Encode(SiafundElementsResponse{
@@ -618,17 +618,17 @@ func (s *server) walletsOutputsSiafundHandler(jc jape.Context) {
 	})
 }
 
-func (s *server) outputsSiacoinSpentHandlerGET(jc jape.Context) {
-	var id types.SiacoinOutputID
+func (s *server) outputsBigFileSpentHandlerGET(jc jape.Context) {
+	var id types.BigFileOutputID
 	if jc.DecodeParam("id", &id) != nil {
 		return
 	}
 
-	event, spent, err := s.wm.SiacoinElementSpentEvent(id)
+	event, spent, err := s.wm.BigFileElementSpentEvent(id)
 	if errors.Is(err, wallet.ErrNotFound) {
 		jc.Error(err, http.StatusNotFound)
 		return
-	} else if jc.Check("couldn't load siacoin element", err) != nil {
+	} else if jc.Check("couldn't load bigfile element", err) != nil {
 		return
 	}
 
@@ -672,8 +672,8 @@ func (s *server) walletsReserveHandler(jc jape.Context) {
 		return
 	}
 
-	ids := make([]types.Hash256, 0, len(wrr.SiacoinOutputs)+len(wrr.SiafundOutputs))
-	for _, id := range wrr.SiacoinOutputs {
+	ids := make([]types.Hash256, 0, len(wrr.BigFileOutputs)+len(wrr.SiafundOutputs))
+	for _, id := range wrr.BigFileOutputs {
 		ids = append(ids, types.Hash256(id))
 	}
 
@@ -693,8 +693,8 @@ func (s *server) walletsReleaseHandler(jc jape.Context) {
 		return
 	}
 
-	ids := make([]types.Hash256, 0, len(wrr.SiacoinOutputs)+len(wrr.SiafundOutputs))
-	for _, id := range wrr.SiacoinOutputs {
+	ids := make([]types.Hash256, 0, len(wrr.BigFileOutputs)+len(wrr.SiafundOutputs))
+	for _, id := range wrr.BigFileOutputs {
 		ids = append(ids, types.Hash256(id))
 	}
 	for _, id := range wrr.SiafundOutputs {
@@ -710,7 +710,7 @@ func (s *server) walletsFundHandler(jc jape.Context) {
 	if jc.DecodeParam("id", &id) != nil || jc.Decode(&wfr) != nil {
 		return
 	}
-	utxos, basis, change, err := s.wm.SelectSiacoinElements(id, wfr.Amount, false)
+	utxos, basis, change, err := s.wm.SelectBigFileElements(id, wfr.Amount, false)
 	if jc.Check("couldn't get utxos to fund transaction", err) != nil {
 		return
 	}
@@ -722,7 +722,7 @@ func (s *server) walletsFundHandler(jc jape.Context) {
 			return
 		}
 
-		txn.SiacoinOutputs = append(txn.SiacoinOutputs, types.SiacoinOutput{
+		txn.BigFileOutputs = append(txn.BigFileOutputs, types.BigFileOutput{
 			Value:   change,
 			Address: wfr.ChangeAddress,
 		})
@@ -730,7 +730,7 @@ func (s *server) walletsFundHandler(jc jape.Context) {
 
 	toSign := make([]types.Hash256, 0, len(utxos))
 	for _, sce := range utxos {
-		txn.SiacoinInputs = append(txn.SiacoinInputs, types.SiacoinInput{
+		txn.BigFileInputs = append(txn.BigFileInputs, types.BigFileInput{
 			ParentID: sce.ID,
 			// UnlockConditions left empty for client to fill in
 		})
@@ -815,17 +815,17 @@ func (s *server) walletsConstructHandler(jc jape.Context) {
 		return
 	}
 
-	var siacoinInput types.Currency
-	for i, sco := range wcr.Siacoins {
+	var bigfileInput types.Currency
+	for i, sco := range wcr.BigFiles {
 		switch {
 		case sco.Value.IsZero():
-			jc.Error(fmt.Errorf("siacoin output %d has zero value", i), http.StatusBadRequest)
+			jc.Error(fmt.Errorf("bigfile output %d has zero value", i), http.StatusBadRequest)
 			return
 		case sco.Address == types.VoidAddress:
-			jc.Error(fmt.Errorf("siacoin output %d has void address", i), http.StatusBadRequest)
+			jc.Error(fmt.Errorf("bigfile output %d has void address", i), http.StatusBadRequest)
 			return
 		}
-		siacoinInput = siacoinInput.Add(sco.Value)
+		bigfileInput = bigfileInput.Add(sco.Value)
 	}
 
 	var siafundInput uint64
@@ -841,7 +841,7 @@ func (s *server) walletsConstructHandler(jc jape.Context) {
 		siafundInput += sfo.Value
 	}
 
-	if siacoinInput.IsZero() && siafundInput == 0 {
+	if bigfileInput.IsZero() && siafundInput == 0 {
 		jc.Error(errors.New("no inputs provided"), http.StatusBadRequest)
 	}
 
@@ -856,18 +856,18 @@ func (s *server) walletsConstructHandler(jc jape.Context) {
 		s.wm.Release(locked)
 	}()
 
-	sces, basis, siacoinChange, err := s.wm.SelectSiacoinElements(walletID, siacoinInput.Add(fee), false)
+	sces, basis, bigfileChange, err := s.wm.SelectBigFileElements(walletID, bigfileInput.Add(fee), false)
 	if err != nil {
-		jc.Error(fmt.Errorf("failed to select siacoin elements: %w", err), http.StatusInternalServerError)
+		jc.Error(fmt.Errorf("failed to select bigfile elements: %w", err), http.StatusInternalServerError)
 		return
 	}
 	for _, sce := range sces {
 		locked = append(locked, types.Hash256(sce.ID))
 	}
 
-	if !siacoinChange.IsZero() {
-		wcr.Siacoins = append(wcr.Siacoins, types.SiacoinOutput{
-			Value:   siacoinChange,
+	if !bigfileChange.IsZero() {
+		wcr.BigFiles = append(wcr.BigFiles, types.BigFileOutput{
+			Value:   bigfileChange,
 			Address: wcr.ChangeAddress,
 		})
 	}
@@ -917,24 +917,24 @@ func (s *server) walletsConstructHandler(jc jape.Context) {
 
 	txn := types.Transaction{
 		MinerFees:      []types.Currency{fee},
-		SiacoinInputs:  make([]types.SiacoinInput, 0, len(sces)),
-		SiacoinOutputs: wcr.Siacoins,
+		BigFileInputs:  make([]types.BigFileInput, 0, len(sces)),
+		BigFileOutputs: wcr.BigFiles,
 		SiafundInputs:  make([]types.SiafundInput, 0, len(sfes)),
 		SiafundOutputs: wcr.Siafunds,
 	}
 
 	for _, sce := range sces {
-		uc, ok := getAddressUnlockConditions(jc, sce.SiacoinOutput.Address)
+		uc, ok := getAddressUnlockConditions(jc, sce.BigFileOutput.Address)
 		if !ok {
 			return
 		}
 
-		sci := types.SiacoinInput{
+		sci := types.BigFileInput{
 			ParentID:         sce.ID,
 			UnlockConditions: uc,
 		}
 
-		txn.SiacoinInputs = append(txn.SiacoinInputs, sci)
+		txn.BigFileInputs = append(txn.BigFileInputs, sci)
 		txn.Signatures = append(txn.Signatures, types.TransactionSignature{
 			ParentID: types.Hash256(sce.ID),
 			CoveredFields: types.CoveredFields{
@@ -998,17 +998,17 @@ func (s *server) walletsConstructV2Handler(jc jape.Context) {
 		return
 	}
 
-	var siacoinInput types.Currency
-	for i, sco := range wcr.Siacoins {
+	var bigfileInput types.Currency
+	for i, sco := range wcr.BigFiles {
 		switch {
 		case sco.Value.IsZero():
-			jc.Error(fmt.Errorf("siacoin output %d has zero value", i), http.StatusBadRequest)
+			jc.Error(fmt.Errorf("bigfile output %d has zero value", i), http.StatusBadRequest)
 			return
 		case sco.Address == types.VoidAddress:
-			jc.Error(fmt.Errorf("siacoin output %d has void address", i), http.StatusBadRequest)
+			jc.Error(fmt.Errorf("bigfile output %d has void address", i), http.StatusBadRequest)
 			return
 		}
-		siacoinInput = siacoinInput.Add(sco.Value)
+		bigfileInput = bigfileInput.Add(sco.Value)
 	}
 
 	var siafundInput uint64
@@ -1024,7 +1024,7 @@ func (s *server) walletsConstructV2Handler(jc jape.Context) {
 		siafundInput += sfo.Value
 	}
 
-	if siacoinInput.IsZero() && siafundInput == 0 {
+	if bigfileInput.IsZero() && siafundInput == 0 {
 		jc.Error(errors.New("no inputs provided"), http.StatusBadRequest)
 	}
 
@@ -1039,18 +1039,18 @@ func (s *server) walletsConstructV2Handler(jc jape.Context) {
 		s.wm.Release(locked)
 	}()
 
-	sces, basis, siacoinChange, err := s.wm.SelectSiacoinElements(walletID, siacoinInput.Add(fee), false)
+	sces, basis, bigfileChange, err := s.wm.SelectBigFileElements(walletID, bigfileInput.Add(fee), false)
 	if err != nil {
-		jc.Error(fmt.Errorf("failed to select siacoin elements: %w", err), http.StatusInternalServerError)
+		jc.Error(fmt.Errorf("failed to select bigfile elements: %w", err), http.StatusInternalServerError)
 		return
 	}
 	for _, sce := range sces {
 		locked = append(locked, types.Hash256(sce.ID))
 	}
 
-	if !siacoinChange.IsZero() {
-		wcr.Siacoins = append(wcr.Siacoins, types.SiacoinOutput{
-			Value:   siacoinChange,
+	if !bigfileChange.IsZero() {
+		wcr.BigFiles = append(wcr.BigFiles, types.BigFileOutput{
+			Value:   bigfileChange,
 			Address: wcr.ChangeAddress,
 		})
 	}
@@ -1097,15 +1097,15 @@ func (s *server) walletsConstructV2Handler(jc jape.Context) {
 
 	txn := types.V2Transaction{
 		MinerFee:       fee,
-		SiacoinInputs:  make([]types.V2SiacoinInput, 0, len(sces)),
-		SiacoinOutputs: wcr.Siacoins,
+		BigFileInputs:  make([]types.V2BigFileInput, 0, len(sces)),
+		BigFileOutputs: wcr.BigFiles,
 		SiafundInputs:  make([]types.V2SiafundInput, 0, len(sfes)),
 		SiafundOutputs: wcr.Siafunds,
 	}
 
 	// the siafund elements are added to the transaction first because `UpdateV2TransactionSet` takes
-	// a V2 transaction as an argument. The Siacoin basis is our target because the transaction is
-	// guaranteed to have a non-zero Siacoin basis while the Siafund basis will be zero when not
+	// a V2 transaction as an argument. The BigFile basis is our target because the transaction is
+	// guaranteed to have a non-zero BigFile basis while the Siafund basis will be zero when not
 	// sending Siafunds.
 	for _, sfe := range sfes {
 		sp, ok := getAddressSpendPolicy(jc, sfe.SiafundOutput.Address)
@@ -1133,18 +1133,18 @@ func (s *server) walletsConstructV2Handler(jc jape.Context) {
 	}
 
 	for _, sce := range sces {
-		sp, ok := getAddressSpendPolicy(jc, sce.SiacoinOutput.Address)
+		sp, ok := getAddressSpendPolicy(jc, sce.BigFileOutput.Address)
 		if !ok {
 			return
 		}
 
-		sci := types.V2SiacoinInput{
+		sci := types.V2BigFileInput{
 			Parent: sce,
 			SatisfiedPolicy: types.SatisfiedPolicy{
 				Policy: sp,
 			},
 		}
-		txn.SiacoinInputs = append(txn.SiacoinInputs, sci)
+		txn.BigFileInputs = append(txn.BigFileInputs, sci)
 	}
 
 	resp.ID = txn.ID()
@@ -1212,11 +1212,11 @@ func (s *server) addressesAddrOutputsSCHandler(jc jape.Context) {
 		return
 	}
 
-	utxos, basis, err := s.wm.AddressSiacoinOutputs(addr, useTPool, offset, limit)
+	utxos, basis, err := s.wm.AddressBigFileOutputs(addr, useTPool, offset, limit)
 	if jc.Check("couldn't load utxos", err) != nil {
 		return
 	}
-	jc.Encode(AddressSiacoinElementsResponse{
+	jc.Encode(AddressBigFileElementsResponse{
 		Basis:   basis,
 		Outputs: utxos,
 	})
@@ -1263,13 +1263,13 @@ func (s *server) eventsHandlerGET(jc jape.Context) {
 	jc.Encode(events[0])
 }
 
-func (s *server) outputsSiacoinHandlerGET(jc jape.Context) {
-	var outputID types.SiacoinOutputID
+func (s *server) outputsBigFileHandlerGET(jc jape.Context) {
+	var outputID types.BigFileOutputID
 	if jc.DecodeParam("id", &outputID) != nil {
 		return
 	}
 
-	output, err := s.wm.SiacoinElement(outputID)
+	output, err := s.wm.BigFileElement(outputID)
 	if jc.Check("couldn't load output", err) != nil {
 		return
 	}
@@ -1418,11 +1418,11 @@ func NewServer(cm ChainManager, s Syncer, wm WalletManager, opts ...ServerOption
 		"GET /addresses/:addr/balance":            wrapPublicAuthHandler(srv.addressesAddrBalanceHandler),
 		"GET /addresses/:addr/events":             wrapPublicAuthHandler(srv.addressesAddrEventsHandlerGET),
 		"GET /addresses/:addr/events/unconfirmed": wrapPublicAuthHandler(srv.addressesAddrEventsUnconfirmedHandlerGET),
-		"GET /addresses/:addr/outputs/siacoin":    wrapPublicAuthHandler(srv.addressesAddrOutputsSCHandler),
+		"GET /addresses/:addr/outputs/bigfile":    wrapPublicAuthHandler(srv.addressesAddrOutputsSCHandler),
 		"GET /addresses/:addr/outputs/siafund":    wrapPublicAuthHandler(srv.addressesAddrOutputsSFHandler),
 
-		"GET /outputs/siacoin/:id":       wrapPublicAuthHandler(srv.outputsSiacoinHandlerGET),
-		"GET /outputs/siacoin/:id/spent": wrapPublicAuthHandler(srv.outputsSiacoinSpentHandlerGET),
+		"GET /outputs/bigfile/:id":       wrapPublicAuthHandler(srv.outputsBigFileHandlerGET),
+		"GET /outputs/bigfile/:id/spent": wrapPublicAuthHandler(srv.outputsBigFileSpentHandlerGET),
 		"GET /outputs/siafund/:id":       wrapPublicAuthHandler(srv.outputsSiafundHandlerGET),
 		"GET /outputs/siafund/:id/spent": wrapPublicAuthHandler(srv.outputsSiafundSpentHandlerGET),
 
@@ -1443,7 +1443,7 @@ func NewServer(cm ChainManager, s Syncer, wm WalletManager, opts ...ServerOption
 		"POST /wallets/:id/construct/transaction":    wrapAuthHandler(srv.walletsConstructHandler),
 		"POST /wallets/:id/construct/v2/transaction": wrapAuthHandler(srv.walletsConstructV2Handler),
 		"GET /wallets/:id/events/unconfirmed":        wrapAuthHandler(srv.walletsEventsUnconfirmedHandlerGET),
-		"GET /wallets/:id/outputs/siacoin":           wrapAuthHandler(srv.walletsOutputsSiacoinHandler),
+		"GET /wallets/:id/outputs/bigfile":           wrapAuthHandler(srv.walletsOutputsBigFileHandler),
 		"GET /wallets/:id/outputs/siafund":           wrapAuthHandler(srv.walletsOutputsSiafundHandler),
 		"POST /wallets/:id/reserve":                  wrapAuthHandler(srv.walletsReserveHandler),
 		"POST /wallets/:id/release":                  wrapAuthHandler(srv.walletsReleaseHandler),

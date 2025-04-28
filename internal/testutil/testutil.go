@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"go.sia.tech/walletd/v2/persist/sqlite"
 	"go.thebigfile.com/core/consensus"
 	"go.thebigfile.com/core/gateway"
 	"go.thebigfile.com/core/types"
 	"go.thebigfile.com/coreutils/chain"
 	"go.thebigfile.com/coreutils/syncer"
 	"go.thebigfile.com/coreutils/testutil"
+	"go.thebigfile.com/walletd/v2/persist/sqlite"
 	"go.uber.org/zap"
 )
 
