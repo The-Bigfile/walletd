@@ -8,14 +8,14 @@ CREATE INDEX chain_indices_height_idx ON chain_indices (block_id, height);
 CREATE TABLE sia_addresses (
 	id INTEGER PRIMARY KEY,
 	sia_address BLOB UNIQUE NOT NULL,
-	siacoin_balance BLOB NOT NULL,
-	immature_siacoin_balance BLOB NOT NULL,
+	bigfile_balance BLOB NOT NULL,
+	immature_bigfile_balance BLOB NOT NULL,
 	siafund_balance INTEGER NOT NULL
 );
 
-CREATE TABLE siacoin_elements (
+CREATE TABLE bigfile_elements (
 	id BLOB PRIMARY KEY,
-	siacoin_value BLOB NOT NULL,
+	bigfile_value BLOB NOT NULL,
 	merkle_proof BLOB NOT NULL,
 	leaf_index INTEGER UNIQUE NOT NULL,
 	maturity_height INTEGER NOT NULL, -- stored as int64 for easier querying
@@ -25,12 +25,12 @@ CREATE TABLE siacoin_elements (
 	spent_index_id INTEGER REFERENCES chain_indices (id), -- soft delete
 	spent_event_id INTEGER REFERENCES events (id) -- atomic swap tracking 
 );
-CREATE INDEX siacoin_elements_address_id_idx ON siacoin_elements (address_id);
-CREATE INDEX siacoin_elements_maturity_height_matured_idx ON siacoin_elements (maturity_height, matured);
-CREATE INDEX siacoin_elements_chain_index_id_idx ON siacoin_elements (chain_index_id);
-CREATE INDEX siacoin_elements_spent_index_id_idx ON siacoin_elements (spent_index_id);
-CREATE INDEX siacoin_elements_spent_event_id_idx ON siacoin_elements (spent_event_id);
-CREATE INDEX siacoin_elements_address_id_spent_index_id_idx ON siacoin_elements(address_id, spent_index_id);
+CREATE INDEX bigfile_elements_address_id_idx ON bigfile_elements (address_id);
+CREATE INDEX bigfile_elements_maturity_height_matured_idx ON bigfile_elements (maturity_height, matured);
+CREATE INDEX bigfile_elements_chain_index_id_idx ON bigfile_elements (chain_index_id);
+CREATE INDEX bigfile_elements_spent_index_id_idx ON bigfile_elements (spent_index_id);
+CREATE INDEX bigfile_elements_spent_event_id_idx ON bigfile_elements (spent_event_id);
+CREATE INDEX bigfile_elements_address_id_spent_index_id_idx ON bigfile_elements(address_id, spent_index_id);
 
 CREATE TABLE siafund_elements (
 	id BLOB PRIMARY KEY,

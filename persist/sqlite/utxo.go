@@ -5,24 +5,24 @@ import (
 	"errors"
 	"fmt"
 
-	"go.sia.tech/core/types"
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/walletd/v2/wallet"
 )
 
-// SiacoinElement returns an unspent Siacoin UTXO by its ID.
-func (s *Store) SiacoinElement(id types.SiacoinOutputID) (ele types.SiacoinElement, err error) {
+// BigFileElement returns an unspent BigFile UTXO by its ID.
+func (s *Store) BigFileElement(id types.BigFileOutputID) (ele types.BigFileElement, err error) {
 	err = s.transaction(func(tx *txn) error {
-		const query = `SELECT se.id, se.siacoin_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.sia_address 
-FROM siacoin_elements se
+		const query = `SELECT se.id, se.bigfile_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.sia_address 
+FROM bigfile_elements se
 INNER JOIN sia_addresses sa ON (se.address_id = sa.id)
 WHERE se.id=$1 AND spent_index_id IS NULL`
 
-		ele, err = scanSiacoinElement(tx.QueryRow(query, encode(id)))
+		ele, err = scanBigFileElement(tx.QueryRow(query, encode(id)))
 		if err != nil {
 			return err
 		}
 
-		// retrieve the merkle proofs for the siacoin element
+		// retrieve the merkle proofs for the bigfile element
 		if s.indexMode == wallet.IndexModeFull {
 			proof, err := fillElementProofs(tx, []uint64{ele.StateElement.LeafIndex})
 			if err != nil {
@@ -71,10 +71,10 @@ WHERE se.id=$1 AND spent_index_id IS NULL`
 	return
 }
 
-// SiacoinElementSpentEvent returns the event that spent a Siacoin UTXO.
-func (s *Store) SiacoinElementSpentEvent(id types.SiacoinOutputID) (ev wallet.Event, spent bool, err error) {
+// BigFileElementSpentEvent returns the event that spent a BigFile UTXO.
+func (s *Store) BigFileElementSpentEvent(id types.BigFileOutputID) (ev wallet.Event, spent bool, err error) {
 	err = s.transaction(func(tx *txn) error {
-		const query = `SELECT spent_event_id FROM siacoin_elements WHERE id=$1`
+		const query = `SELECT spent_event_id FROM bigfile_elements WHERE id=$1`
 
 		var spentEventID sql.NullInt64
 		err = tx.QueryRow(query, encode(id)).Scan(&spentEventID)

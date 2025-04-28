@@ -3,8 +3,8 @@ package wallet
 import (
 	"fmt"
 
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/chain"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/chain"
 	"go.uber.org/zap"
 )
 
@@ -27,10 +27,10 @@ type (
 		Balance
 	}
 
-	// SpentSiacoinElement pairs a spent siacoin element with the ID of the
+	// SpentBigFileElement pairs a spent bigfile element with the ID of the
 	// transaction that spent it.
-	SpentSiacoinElement struct {
-		types.SiacoinElement
+	SpentBigFileElement struct {
+		types.BigFileElement
 		EventID types.TransactionID
 	}
 
@@ -46,8 +46,8 @@ type (
 	AppliedState struct {
 		NumLeaves              uint64
 		Events                 []Event
-		CreatedSiacoinElements []types.SiacoinElement
-		SpentSiacoinElements   []SpentSiacoinElement
+		CreatedBigFileElements []types.BigFileElement
+		SpentBigFileElements   []SpentBigFileElement
 		CreatedSiafundElements []types.SiafundElement
 		SpentSiafundElements   []SpentSiafundElement
 	}
@@ -56,8 +56,8 @@ type (
 	// a chain update.
 	RevertedState struct {
 		NumLeaves              uint64
-		UnspentSiacoinElements []types.SiacoinElement
-		DeletedSiacoinElements []types.SiacoinElement
+		UnspentBigFileElements []types.BigFileElement
+		DeletedBigFileElements []types.BigFileElement
 		UnspentSiafundElements []types.SiafundElement
 		DeletedSiafundElements []types.SiafundElement
 	}
@@ -109,7 +109,7 @@ func applyChainUpdate(tx UpdateTx, cau chain.ApplyUpdate, indexMode IndexMode) e
 	spentEventIDs := make(map[types.Hash256]types.TransactionID)
 	for _, txn := range cau.Block.Transactions {
 		txnID := txn.ID()
-		for _, input := range txn.SiacoinInputs {
+		for _, input := range txn.BigFileInputs {
 			spentEventIDs[types.Hash256(input.ParentID)] = txnID
 		}
 		for _, input := range txn.SiafundInputs {
@@ -118,7 +118,7 @@ func applyChainUpdate(tx UpdateTx, cau chain.ApplyUpdate, indexMode IndexMode) e
 	}
 	for _, txn := range cau.Block.V2Transactions() {
 		txnID := txn.ID()
-		for _, input := range txn.SiacoinInputs {
+		for _, input := range txn.BigFileInputs {
 			spentEventIDs[types.Hash256(input.Parent.ID)] = txnID
 		}
 		for _, input := range txn.SiafundInputs {
@@ -126,12 +126,12 @@ func applyChainUpdate(tx UpdateTx, cau chain.ApplyUpdate, indexMode IndexMode) e
 		}
 	}
 
-	// add new siacoin elements to the store
-	for _, sced := range cau.SiacoinElementDiffs() {
-		sce := sced.SiacoinElement
-		if (sced.Created && sced.Spent) || sce.SiacoinOutput.Value.IsZero() {
+	// add new bigfile elements to the store
+	for _, sced := range cau.BigFileElementDiffs() {
+		sce := sced.BigFileElement
+		if (sced.Created && sced.Spent) || sce.BigFileOutput.Value.IsZero() {
 			continue
-		} else if relevant, err := tx.AddressRelevant(sce.SiacoinOutput.Address); err != nil {
+		} else if relevant, err := tx.AddressRelevant(sce.BigFileOutput.Address); err != nil {
 			panic(err)
 		} else if !relevant {
 			continue
@@ -139,14 +139,14 @@ func applyChainUpdate(tx UpdateTx, cau chain.ApplyUpdate, indexMode IndexMode) e
 		if sced.Spent {
 			spentTxnID, ok := spentEventIDs[types.Hash256(sce.ID)]
 			if !ok {
-				panic(fmt.Errorf("missing transaction ID for spent siacoin element %v", sce.ID))
+				panic(fmt.Errorf("missing transaction ID for spent bigfile element %v", sce.ID))
 			}
-			applied.SpentSiacoinElements = append(applied.SpentSiacoinElements, SpentSiacoinElement{
-				SiacoinElement: sce,
+			applied.SpentBigFileElements = append(applied.SpentBigFileElements, SpentBigFileElement{
+				BigFileElement: sce,
 				EventID:        spentTxnID,
 			})
 		} else {
-			applied.CreatedSiacoinElements = append(applied.CreatedSiacoinElements, sce)
+			applied.CreatedBigFileElements = append(applied.CreatedBigFileElements, sce)
 		}
 	}
 	for _, sfed := range cau.SiafundElementDiffs() {
@@ -196,17 +196,17 @@ func revertChainUpdate(tx UpdateTx, cru chain.RevertUpdate, revertedIndex types.
 		NumLeaves: cru.State.Elements.NumLeaves,
 	}
 
-	// determine which siacoin and siafund elements are ephemeral
+	// determine which bigfile and siafund elements are ephemeral
 	//
 	// note: I thought we could use LeafIndex == EphemeralLeafIndex, but
 	// it seems to be set before the subscriber is called.
 	created := make(map[types.Hash256]bool)
 	ephemeral := make(map[types.Hash256]bool)
 	for _, txn := range cru.Block.Transactions {
-		for i := range txn.SiacoinOutputs {
-			created[types.Hash256(txn.SiacoinOutputID(i))] = true
+		for i := range txn.BigFileOutputs {
+			created[types.Hash256(txn.BigFileOutputID(i))] = true
 		}
-		for _, input := range txn.SiacoinInputs {
+		for _, input := range txn.BigFileInputs {
 			ephemeral[types.Hash256(input.ParentID)] = created[types.Hash256(input.ParentID)]
 		}
 		for i := range txn.SiafundOutputs {
@@ -217,21 +217,21 @@ func revertChainUpdate(tx UpdateTx, cru chain.RevertUpdate, revertedIndex types.
 		}
 	}
 
-	for _, sced := range cru.SiacoinElementDiffs() {
-		sce := sced.SiacoinElement
-		if (sced.Created && sced.Spent) || sce.SiacoinOutput.Value.IsZero() {
+	for _, sced := range cru.BigFileElementDiffs() {
+		sce := sced.BigFileElement
+		if (sced.Created && sced.Spent) || sce.BigFileOutput.Value.IsZero() {
 			continue
-		} else if relevant, err := tx.AddressRelevant(sce.SiacoinOutput.Address); err != nil {
+		} else if relevant, err := tx.AddressRelevant(sce.BigFileOutput.Address); err != nil {
 			panic(err)
 		} else if !relevant {
 			continue
 		}
 		if sced.Spent {
-			// re-add any spent siacoin elements
-			reverted.UnspentSiacoinElements = append(reverted.UnspentSiacoinElements, sce)
+			// re-add any spent bigfile elements
+			reverted.UnspentBigFileElements = append(reverted.UnspentBigFileElements, sce)
 		} else {
-			// delete any created siacoin elements
-			reverted.DeletedSiacoinElements = append(reverted.DeletedSiacoinElements, sce)
+			// delete any created bigfile elements
+			reverted.DeletedBigFileElements = append(reverted.DeletedBigFileElements, sce)
 		}
 	}
 	for _, sfed := range cru.SiafundElementDiffs() {

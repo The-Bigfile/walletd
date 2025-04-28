@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/chain"
-	"go.sia.tech/walletd/v2/internal/threadgroup"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/chain"
+	"go.thebigfile.com/walletd/v2/internal/threadgroup"
 	"go.uber.org/zap"
 )
 
@@ -75,7 +75,7 @@ type (
 		DeleteWallet(walletID ID) error
 		WalletBalance(walletID ID) (Balance, error)
 		WalletAddress(ID, types.Address) (Address, error)
-		WalletSiacoinOutputs(walletID ID, offset, limit int) ([]types.SiacoinElement, types.ChainIndex, error)
+		WalletBigFileOutputs(walletID ID, offset, limit int) ([]types.BigFileElement, types.ChainIndex, error)
 		WalletSiafundOutputs(walletID ID, offset, limit int) ([]types.SiafundElement, types.ChainIndex, error)
 		WalletAddresses(walletID ID) ([]Address, error)
 		Wallets() ([]Wallet, error)
@@ -85,19 +85,19 @@ type (
 
 		AddressBalance(address types.Address) (balance Balance, err error)
 		AddressEvents(address types.Address, offset, limit int) (events []Event, err error)
-		AddressSiacoinOutputs(address types.Address, tpoolSpent []types.SiacoinOutputID, offset, limit int) ([]UnspentSiacoinElement, types.ChainIndex, error)
+		AddressBigFileOutputs(address types.Address, tpoolSpent []types.BigFileOutputID, offset, limit int) ([]UnspentBigFileElement, types.ChainIndex, error)
 		AddressSiafundOutputs(address types.Address, tpoolSpent []types.SiafundOutputID, offset, limit int) ([]UnspentSiafundElement, types.ChainIndex, error)
 
 		Events(eventIDs []types.Hash256) ([]Event, error)
 		AnnotateV1Events(index types.ChainIndex, timestamp time.Time, v1 []types.Transaction) (annotated []Event, err error)
 
-		SiacoinElement(types.SiacoinOutputID) (types.SiacoinElement, error)
+		BigFileElement(types.BigFileOutputID) (types.BigFileElement, error)
 		SiafundElement(types.SiafundOutputID) (types.SiafundElement, error)
-		// SiacoinElementSpentEvent returns the event of a spent siacoin element.
+		// BigFileElementSpentEvent returns the event of a spent bigfile element.
 		// If the element is not spent, the return value will be (Event{}, false, nil).
 		// If the element is not found, the error will be ErrNotFound. An element
 		// is only tracked for 144 blocks after it is spent.
-		SiacoinElementSpentEvent(types.SiacoinOutputID) (Event, bool, error)
+		BigFileElementSpentEvent(types.BigFileOutputID) (Event, bool, error)
 		// SiafundElementSpentEvent returns the event of a spent siafund element.
 		// If the element is not spent, the second return value will be (Event{}, false, nil).
 		// If the element is not found, the error will be ErrNotFound. An element
@@ -124,11 +124,11 @@ type (
 		// tracks the state of utxos in the transaction pool
 		// this local state is used to remove a race between
 		// the wallet indexing and the chain manager
-		poolSCCreated      map[types.SiacoinOutputID]types.SiacoinElement
+		poolSCCreated      map[types.BigFileOutputID]types.BigFileElement
 		poolSFCreated      map[types.SiafundOutputID]types.SiafundElement
-		poolSCSpent        map[types.SiacoinOutputID]bool
+		poolSCSpent        map[types.BigFileOutputID]bool
 		poolSFSpent        map[types.SiafundOutputID]bool
-		poolAddressSCSpent map[types.Address][]types.SiacoinOutputID
+		poolAddressSCSpent map[types.Address][]types.BigFileOutputID
 		poolAddressSFSpent map[types.Address][]types.SiafundOutputID
 	}
 )
@@ -233,10 +233,10 @@ func (m *Manager) WalletEvents(walletID ID, offset, limit int) ([]Event, error) 
 	return m.store.WalletEvents(walletID, offset, limit)
 }
 
-// UnspentSiacoinOutputs returns a paginated list of matured siacoin outputs
+// UnspentBigFileOutputs returns a paginated list of matured bigfile outputs
 // relevant to the wallet
-func (m *Manager) UnspentSiacoinOutputs(walletID ID, offset, limit int) ([]types.SiacoinElement, types.ChainIndex, error) {
-	return m.store.WalletSiacoinOutputs(walletID, offset, limit)
+func (m *Manager) UnspentBigFileOutputs(walletID ID, offset, limit int) ([]types.BigFileElement, types.ChainIndex, error) {
+	return m.store.WalletBigFileOutputs(walletID, offset, limit)
 }
 
 // UnspentSiafundOutputs returns a paginated list of siafund outputs relevant to
@@ -317,10 +317,10 @@ func (m *Manager) WalletAddress(id ID, addr types.Address) (Address, error) {
 	return m.store.WalletAddress(id, addr)
 }
 
-// SelectSiacoinElements selects siacoin elements from the wallet that sum to
+// SelectBigFileElements selects bigfile elements from the wallet that sum to
 // at least the given amount. Returns the elements, the element basis, and the
 // change amount.
-func (m *Manager) SelectSiacoinElements(walletID ID, amount types.Currency, useUnconfirmed bool) ([]types.SiacoinElement, types.ChainIndex, types.Currency, error) {
+func (m *Manager) SelectBigFileElements(walletID ID, amount types.Currency, useUnconfirmed bool) ([]types.BigFileElement, types.ChainIndex, types.Currency, error) {
 	// sanity check that the wallet exists
 	if _, err := m.WalletBalance(walletID); err != nil {
 		return nil, types.ChainIndex{}, types.ZeroCurrency, err
@@ -345,11 +345,11 @@ func (m *Manager) SelectSiacoinElements(walletID ID, amount types.Currency, useU
 		return true, nil
 	}
 
-	var ephemeral []types.SiacoinElement
+	var ephemeral []types.BigFileElement
 	for _, sce := range m.poolSCCreated {
-		exists, err := relevantAddr(sce.SiacoinOutput.Address)
+		exists, err := relevantAddr(sce.BigFileOutput.Address)
 		if err != nil {
-			return nil, types.ChainIndex{}, types.ZeroCurrency, fmt.Errorf("failed to check if address %q is relevant: %w", sce.SiacoinOutput.Address, err)
+			return nil, types.ChainIndex{}, types.ZeroCurrency, fmt.Errorf("failed to check if address %q is relevant: %w", sce.BigFileOutput.Address, err)
 		} else if !exists {
 			continue
 		}
@@ -358,19 +358,19 @@ func (m *Manager) SelectSiacoinElements(walletID ID, amount types.Currency, useU
 	inPool := m.poolSCSpent
 
 	var inputSum types.Currency
-	var selected []types.SiacoinElement
+	var selected []types.BigFileElement
 	var utxoIDs []types.Hash256
 	var basis types.ChainIndex
 	const utxoBatchSize = 100
 top:
 	for i := 0; ; i += utxoBatchSize {
-		var utxos []types.SiacoinElement
+		var utxos []types.BigFileElement
 		var err error
 		// extra large wallets may need to paginate through utxos
 		// to find enough to cover the amount
-		utxos, basis, err = m.store.WalletSiacoinOutputs(walletID, i, utxoBatchSize)
+		utxos, basis, err = m.store.WalletBigFileOutputs(walletID, i, utxoBatchSize)
 		if err != nil {
-			return nil, types.ChainIndex{}, types.ZeroCurrency, fmt.Errorf("failed to get siacoin elements: %w", err)
+			return nil, types.ChainIndex{}, types.ZeroCurrency, fmt.Errorf("failed to get bigfile elements: %w", err)
 		} else if len(utxos) == 0 {
 			break top
 		}
@@ -382,7 +382,7 @@ top:
 
 			selected = append(selected, sce)
 			utxoIDs = append(utxoIDs, types.Hash256(sce.ID))
-			inputSum = inputSum.Add(sce.SiacoinOutput.Value)
+			inputSum = inputSum.Add(sce.BigFileOutput.Value)
 			if inputSum.Cmp(amount) >= 0 {
 				break top
 			}
@@ -400,7 +400,7 @@ top:
 			}
 
 			selected = append(selected, sce)
-			inputSum = inputSum.Add(sce.SiacoinOutput.Value)
+			inputSum = inputSum.Add(sce.BigFileOutput.Value)
 			if inputSum.Cmp(amount) >= 0 {
 				break
 			}
@@ -492,9 +492,9 @@ func (m *Manager) IndexMode() IndexMode {
 	return m.indexMode
 }
 
-// SiacoinElement returns the unspent siacoin element with the given id.
-func (m *Manager) SiacoinElement(id types.SiacoinOutputID) (types.SiacoinElement, error) {
-	return m.store.SiacoinElement(id)
+// BigFileElement returns the unspent bigfile element with the given id.
+func (m *Manager) BigFileElement(id types.BigFileOutputID) (types.BigFileElement, error) {
+	return m.store.BigFileElement(id)
 }
 
 // SiafundElement returns the unspent siafund element with the given id.
@@ -502,12 +502,12 @@ func (m *Manager) SiafundElement(id types.SiafundOutputID) (types.SiafundElement
 	return m.store.SiafundElement(id)
 }
 
-// SiacoinElementSpentEvent returns the event of a spent siacoin element.
+// BigFileElementSpentEvent returns the event of a spent bigfile element.
 // If the element is not spent, the return value will be (Event{}, false, nil).
 // If the element is not found, the error will be ErrNotFound. An element
 // is only tracked for 144 blocks after it is spent.
-func (m *Manager) SiacoinElementSpentEvent(id types.SiacoinOutputID) (Event, bool, error) {
-	return m.store.SiacoinElementSpentEvent(id)
+func (m *Manager) BigFileElementSpentEvent(id types.BigFileOutputID) (Event, bool, error) {
+	return m.store.BigFileElementSpentEvent(id)
 }
 
 // SiafundElementSpentEvent returns the event of a spent siafund element.
@@ -556,27 +556,27 @@ func syncStore(ctx context.Context, store Store, cm ChainManager, index types.Ch
 //
 // It is expected that the caller holds the manager's lock.
 func (m *Manager) resetPool() {
-	m.poolSCCreated = make(map[types.SiacoinOutputID]types.SiacoinElement)
-	m.poolSCSpent = make(map[types.SiacoinOutputID]bool)
+	m.poolSCCreated = make(map[types.BigFileOutputID]types.BigFileElement)
+	m.poolSCSpent = make(map[types.BigFileOutputID]bool)
 
 	m.poolSFCreated = make(map[types.SiafundOutputID]types.SiafundElement)
 	m.poolSFSpent = make(map[types.SiafundOutputID]bool)
 
-	m.poolAddressSCSpent = make(map[types.Address][]types.SiacoinOutputID)
+	m.poolAddressSCSpent = make(map[types.Address][]types.BigFileOutputID)
 	m.poolAddressSFSpent = make(map[types.Address][]types.SiafundOutputID)
 
 	for _, txn := range m.chain.PoolTransactions() {
-		for _, input := range txn.SiacoinInputs {
+		for _, input := range txn.BigFileInputs {
 			m.poolSCSpent[input.ParentID] = true
 			m.poolAddressSCSpent[input.UnlockConditions.UnlockHash()] = append(m.poolAddressSCSpent[input.UnlockConditions.UnlockHash()], input.ParentID)
 			delete(m.poolSCCreated, input.ParentID)
 		}
-		for i, sco := range txn.SiacoinOutputs {
-			scoid := txn.SiacoinOutputID(i)
-			m.poolSCCreated[scoid] = types.SiacoinElement{
+		for i, sco := range txn.BigFileOutputs {
+			scoid := txn.BigFileOutputID(i)
+			m.poolSCCreated[scoid] = types.BigFileElement{
 				ID:            scoid,
 				StateElement:  types.StateElement{LeafIndex: types.UnassignedLeafIndex},
-				SiacoinOutput: sco,
+				BigFileOutput: sco,
 			}
 		}
 
@@ -595,13 +595,13 @@ func (m *Manager) resetPool() {
 	}
 
 	for _, txn := range m.chain.V2PoolTransactions() {
-		for _, input := range txn.SiacoinInputs {
+		for _, input := range txn.BigFileInputs {
 			m.poolSCSpent[input.Parent.ID] = true
-			m.poolAddressSCSpent[input.Parent.SiacoinOutput.Address] = append(m.poolAddressSCSpent[input.Parent.SiacoinOutput.Address], input.Parent.ID)
+			m.poolAddressSCSpent[input.Parent.BigFileOutput.Address] = append(m.poolAddressSCSpent[input.Parent.BigFileOutput.Address], input.Parent.ID)
 			delete(m.poolSCCreated, input.Parent.ID)
 		}
-		for i := range txn.SiacoinOutputs {
-			sce := txn.EphemeralSiacoinOutput(i)
+		for i := range txn.BigFileOutputs {
+			sce := txn.EphemeralBigFileOutput(i)
 			m.poolSCCreated[sce.ID] = sce
 		}
 
@@ -631,13 +631,13 @@ func NewManager(cm ChainManager, store Store, opts ...Option) (*Manager, error) 
 
 		used: make(map[types.Hash256]time.Time),
 
-		poolSCSpent:   make(map[types.SiacoinOutputID]bool),
-		poolSCCreated: make(map[types.SiacoinOutputID]types.SiacoinElement),
+		poolSCSpent:   make(map[types.BigFileOutputID]bool),
+		poolSCCreated: make(map[types.BigFileOutputID]types.BigFileElement),
 
 		poolSFSpent:   make(map[types.SiafundOutputID]bool),
 		poolSFCreated: make(map[types.SiafundOutputID]types.SiafundElement),
 
-		poolAddressSCSpent: make(map[types.Address][]types.SiacoinOutputID),
+		poolAddressSCSpent: make(map[types.Address][]types.BigFileOutputID),
 		poolAddressSFSpent: make(map[types.Address][]types.SiafundOutputID),
 	}
 

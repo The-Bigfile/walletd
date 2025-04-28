@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.sia.tech/core/types"
+	"go.thebigfile.com/core/types"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )
@@ -22,14 +22,14 @@ CREATE INDEX chain_indices_height ON chain_indices (block_id, height);
 CREATE TABLE sia_addresses (
 	id INTEGER PRIMARY KEY,
 	sia_address BLOB UNIQUE NOT NULL,
-	siacoin_balance BLOB NOT NULL,
-	immature_siacoin_balance BLOB NOT NULL,
+	bigfile_balance BLOB NOT NULL,
+	immature_bigfile_balance BLOB NOT NULL,
 	siafund_balance INTEGER NOT NULL
 );
 
-CREATE TABLE siacoin_elements (
+CREATE TABLE bigfile_elements (
 	id BLOB PRIMARY KEY,
-	siacoin_value BLOB NOT NULL,
+	bigfile_value BLOB NOT NULL,
 	merkle_proof BLOB NOT NULL,
 	leaf_index INTEGER NOT NULL,
 	maturity_height INTEGER NOT NULL, /* stored as int64 for easier querying */
@@ -38,11 +38,11 @@ CREATE TABLE siacoin_elements (
 	chain_index_id INTEGER NOT NULL REFERENCES chain_indices (id),
 	spent_index_id INTEGER REFERENCES chain_indices (id) /* soft delete */
 );
-CREATE INDEX siacoin_elements_address_id ON siacoin_elements (address_id);
-CREATE INDEX siacoin_elements_maturity_height_matured ON siacoin_elements (maturity_height, matured);
-CREATE INDEX siacoin_elements_chain_index_id ON siacoin_elements (chain_index_id);
-CREATE INDEX siacoin_elements_spent_index_id ON siacoin_elements (spent_index_id);
-CREATE INDEX siacoin_elements_address_id_spent_index_id ON siacoin_elements(address_id, spent_index_id);
+CREATE INDEX bigfile_elements_address_id ON bigfile_elements (address_id);
+CREATE INDEX bigfile_elements_maturity_height_matured ON bigfile_elements (maturity_height, matured);
+CREATE INDEX bigfile_elements_chain_index_id ON bigfile_elements (chain_index_id);
+CREATE INDEX bigfile_elements_spent_index_id ON bigfile_elements (spent_index_id);
+CREATE INDEX bigfile_elements_address_id_spent_index_id ON bigfile_elements(address_id, spent_index_id);
 
 CREATE TABLE siafund_elements (
 	id BLOB PRIMARY KEY,

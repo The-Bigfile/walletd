@@ -1,6 +1,4 @@
-# [![Sia](https://sia.tech/assets/banners/sia-banner-expanded-walletd.png)](http://sia.tech)
-
-[![GoDoc](https://godoc.org/go.sia.tech/walletd?status.svg)](https://godoc.org/go.sia.tech/walletd)
+[![GoDoc](https://godoc.org/go.thebigfile.com/walletd?status.svg)](https://godoc.org/go.thebigfile.com/walletd)
 
 ## Overview
 
@@ -232,7 +230,7 @@ You can create a custom local testnet by creating a network.json file locally an
     "transactions": [
       {
         "id": "268ef8627241b3eb505cea69b21379c4b91c21dfc4b3f3f58c66316249058cfd",
-        "siacoinOutputs": [
+        "bigfileOutputs": [
           {
             "value": "1000000000000000000000000000000000000",
             "address": "3d7f707d05f2e0ec7ccc9220ed7c8af3bc560fbee84d068c2cc28151d617899e1ee8bc069946"

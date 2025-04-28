@@ -3,7 +3,7 @@ package sqlite
 import (
 	"fmt"
 
-	"go.sia.tech/core/types"
+	"go.thebigfile.com/core/types"
 	"go.uber.org/zap"
 )
 
@@ -16,11 +16,11 @@ ALTER TABLE global_settings ADD COLUMN key_salt BLOB;`)
 	return err
 }
 
-// migrateVersion7 adds spent_event_id columns to siacoin_elements and
+// migrateVersion7 adds spent_event_id columns to bigfile_elements and
 // siafund_elements to track the event that spent the element.
 func migrateVersion7(tx *txn, _ *zap.Logger) error {
-	const query = `ALTER TABLE siacoin_elements ADD COLUMN spent_event_id INTEGER REFERENCES events (id);
-CREATE INDEX siacoin_elements_spent_event_id_idx ON siacoin_elements (spent_event_id);
+	const query = `ALTER TABLE bigfile_elements ADD COLUMN spent_event_id INTEGER REFERENCES events (id);
+CREATE INDEX bigfile_elements_spent_event_id_idx ON bigfile_elements (spent_event_id);
 ALTER TABLE siafund_elements ADD COLUMN spent_event_id INTEGER REFERENCES events (id);
 CREATE INDEX siafund_elements_spent_event_id_idx ON siafund_elements (spent_event_id);`
 	_, err := tx.Exec(query)
@@ -53,8 +53,8 @@ CREATE INDEX event_addresses_event_id_address_id_event_maturity_height_event_id_
 // migrateVersion5 resets the database to trigger a full resync to switch
 // events from JSON to Sia encoding
 func migrateVersion5(tx *txn, _ *zap.Logger) error {
-	if _, err := tx.Exec(`DELETE FROM siacoin_elements;`); err != nil {
-		return fmt.Errorf("failed to delete siacoin_elements: %w", err)
+	if _, err := tx.Exec(`DELETE FROM bigfile_elements;`); err != nil {
+		return fmt.Errorf("failed to delete bigfile_elements: %w", err)
 	} else if _, err := tx.Exec(`DELETE FROM siafund_elements;`); err != nil {
 		return fmt.Errorf("failed to delete siafund_elements: %w", err)
 	} else if _, err := tx.Exec(`DELETE FROM state_tree;`); err != nil {
@@ -65,8 +65,8 @@ func migrateVersion5(tx *txn, _ *zap.Logger) error {
 		return fmt.Errorf("failed to delete events: %w", err)
 	} else if _, err := tx.Exec(`DELETE FROM chain_indices;`); err != nil {
 		return fmt.Errorf("failed to delete chain_indices: %w", err)
-	} else if _, err := tx.Exec(`DROP TABLE siacoin_elements;`); err != nil {
-		return fmt.Errorf("failed to drop siacoin_elements: %w", err)
+	} else if _, err := tx.Exec(`DROP TABLE bigfile_elements;`); err != nil {
+		return fmt.Errorf("failed to drop bigfile_elements: %w", err)
 	} else if _, err := tx.Exec(`DROP TABLE siafund_elements;`); err != nil {
 		return fmt.Errorf("failed to drop siafund_elements: %w", err)
 	}
@@ -76,14 +76,14 @@ func migrateVersion5(tx *txn, _ *zap.Logger) error {
 		return fmt.Errorf("failed to reset global_settings: %w", err)
 	}
 
-	_, err = tx.Exec(`UPDATE sia_addresses SET siacoin_balance=$1, immature_siacoin_balance=$1, siafund_balance=0;`, encode(types.ZeroCurrency))
+	_, err = tx.Exec(`UPDATE sia_addresses SET bigfile_balance=$1, immature_bigfile_balance=$1, siafund_balance=0;`, encode(types.ZeroCurrency))
 	if err != nil {
 		return fmt.Errorf("failed to reset sia_addresses: %w", err)
 	}
 
-	_, err = tx.Exec(`CREATE TABLE siacoin_elements (
+	_, err = tx.Exec(`CREATE TABLE bigfile_elements (
 	id BLOB PRIMARY KEY,
-	siacoin_value BLOB NOT NULL,
+	bigfile_value BLOB NOT NULL,
 	merkle_proof BLOB NOT NULL,
 	leaf_index INTEGER UNIQUE NOT NULL,
 	maturity_height INTEGER NOT NULL, /* stored as int64 for easier querying */
@@ -92,13 +92,13 @@ func migrateVersion5(tx *txn, _ *zap.Logger) error {
 	chain_index_id INTEGER NOT NULL REFERENCES chain_indices (id),
 	spent_index_id INTEGER REFERENCES chain_indices (id) /* soft delete */
 );
-CREATE INDEX siacoin_elements_address_id_idx ON siacoin_elements (address_id);
-CREATE INDEX siacoin_elements_maturity_height_matured_idx ON siacoin_elements (maturity_height, matured);
-CREATE INDEX siacoin_elements_chain_index_id_idx ON siacoin_elements (chain_index_id);
-CREATE INDEX siacoin_elements_spent_index_id_idx ON siacoin_elements (spent_index_id);
-CREATE INDEX siacoin_elements_address_id_spent_index_id_idx ON siacoin_elements(address_id, spent_index_id);`)
+CREATE INDEX bigfile_elements_address_id_idx ON bigfile_elements (address_id);
+CREATE INDEX bigfile_elements_maturity_height_matured_idx ON bigfile_elements (maturity_height, matured);
+CREATE INDEX bigfile_elements_chain_index_id_idx ON bigfile_elements (chain_index_id);
+CREATE INDEX bigfile_elements_spent_index_id_idx ON bigfile_elements (spent_index_id);
+CREATE INDEX bigfile_elements_address_id_spent_index_id_idx ON bigfile_elements(address_id, spent_index_id);`)
 	if err != nil {
-		return fmt.Errorf("failed to create siacoin_elements: %w", err)
+		return fmt.Errorf("failed to create bigfile_elements: %w", err)
 	}
 
 	_, err = tx.Exec(`CREATE TABLE siafund_elements (
@@ -162,11 +162,11 @@ CREATE INDEX wallet_addresses_wallet_id_address_id_idx ON wallet_addresses (wall
 // migrateVersion2 recreates indices and speeds up event queries
 func migrateVersion2(tx *txn, _ *zap.Logger) error {
 	_, err := tx.Exec(`DROP INDEX IF EXISTS chain_indices_height;
-DROP INDEX IF EXISTS siacoin_elements_address_id;
-DROP INDEX IF EXISTS siacoin_elements_maturity_height_matured;
-DROP INDEX IF EXISTS siacoin_elements_chain_index_id;
-DROP INDEX IF EXISTS siacoin_elements_spent_index_id;
-DROP INDEX IF EXISTS siacoin_elements_address_id_spent_index_id;
+DROP INDEX IF EXISTS bigfile_elements_address_id;
+DROP INDEX IF EXISTS bigfile_elements_maturity_height_matured;
+DROP INDEX IF EXISTS bigfile_elements_chain_index_id;
+DROP INDEX IF EXISTS bigfile_elements_spent_index_id;
+DROP INDEX IF EXISTS bigfile_elements_address_id_spent_index_id;
 DROP INDEX IF EXISTS siafund_elements_address_id;
 DROP INDEX IF EXISTS siafund_elements_chain_index_id;
 DROP INDEX IF EXISTS siafund_elements_spent_index_id;
@@ -179,11 +179,11 @@ DROP INDEX IF EXISTS wallet_addresses_address_id;
 DROP INDEX IF EXISTS syncer_bans_expiration_index;
 
 CREATE INDEX IF NOT EXISTS chain_indices_height_idx ON chain_indices (block_id, height);
-CREATE INDEX IF NOT EXISTS siacoin_elements_address_id_idx ON siacoin_elements (address_id);
-CREATE INDEX IF NOT EXISTS siacoin_elements_maturity_height_matured_idx ON siacoin_elements (maturity_height, matured);
-CREATE INDEX IF NOT EXISTS siacoin_elements_chain_index_id_idx ON siacoin_elements (chain_index_id);
-CREATE INDEX IF NOT EXISTS siacoin_elements_spent_index_id_idx ON siacoin_elements (spent_index_id);
-CREATE INDEX IF NOT EXISTS siacoin_elements_address_id_spent_index_id_idx ON siacoin_elements(address_id, spent_index_id);
+CREATE INDEX IF NOT EXISTS bigfile_elements_address_id_idx ON bigfile_elements (address_id);
+CREATE INDEX IF NOT EXISTS bigfile_elements_maturity_height_matured_idx ON bigfile_elements (maturity_height, matured);
+CREATE INDEX IF NOT EXISTS bigfile_elements_chain_index_id_idx ON bigfile_elements (chain_index_id);
+CREATE INDEX IF NOT EXISTS bigfile_elements_spent_index_id_idx ON bigfile_elements (spent_index_id);
+CREATE INDEX IF NOT EXISTS bigfile_elements_address_id_spent_index_id_idx ON bigfile_elements(address_id, spent_index_id);
 CREATE INDEX IF NOT EXISTS siafund_elements_address_id_idx ON siafund_elements (address_id);
 CREATE INDEX IF NOT EXISTS siafund_elements_chain_index_id_idx ON siafund_elements (chain_index_id);
 CREATE INDEX IF NOT EXISTS siafund_elements_spent_index_id_idx ON siafund_elements (spent_index_id);

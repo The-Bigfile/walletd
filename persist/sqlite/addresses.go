@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"time"
 
-	"go.sia.tech/core/types"
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/walletd/v2/wallet"
 )
 
 // AddressBalance returns the balance of a single address.
 func (s *Store) AddressBalance(address types.Address) (balance wallet.Balance, err error) {
 	err = s.transaction(func(tx *txn) error {
-		const query = `SELECT siacoin_balance, immature_siacoin_balance, siafund_balance FROM sia_addresses WHERE sia_address=$1`
-		err := tx.QueryRow(query, encode(address)).Scan(decode(&balance.Siacoins), decode(&balance.ImmatureSiacoins), &balance.Siafunds)
+		const query = `SELECT bigfile_balance, immature_bigfile_balance, siafund_balance FROM sia_addresses WHERE sia_address=$1`
+		err := tx.QueryRow(query, encode(address)).Scan(decode(&balance.BigFiles), decode(&balance.ImmatureBigFiles), &balance.Siafunds)
 		if errors.Is(err, sql.ErrNoRows) {
 			balance = wallet.Balance{}
 			return nil
@@ -69,16 +69,16 @@ func (s *Store) AddressEvents(address types.Address, offset, limit int) (events 
 	return
 }
 
-// AddressSiacoinOutputs returns the unspent siacoin outputs for an address.
-func (s *Store) AddressSiacoinOutputs(address types.Address, tpoolSpent []types.SiacoinOutputID, offset, limit int) (siacoins []wallet.UnspentSiacoinElement, basis types.ChainIndex, err error) {
+// AddressBigFileOutputs returns the unspent bigfile outputs for an address.
+func (s *Store) AddressBigFileOutputs(address types.Address, tpoolSpent []types.BigFileOutputID, offset, limit int) (bigfiles []wallet.UnspentBigFileElement, basis types.ChainIndex, err error) {
 	err = s.transaction(func(tx *txn) error {
 		basis, err = getScanBasis(tx)
 		if err != nil {
 			return fmt.Errorf("failed to get basis: %w", err)
 		}
 
-		query := `SELECT se.id, se.siacoin_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.sia_address, ci.height 
-		FROM siacoin_elements se
+		query := `SELECT se.id, se.bigfile_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.sia_address, ci.height 
+		FROM bigfile_elements se
 		INNER JOIN chain_indices ci ON (se.chain_index_id = ci.id)
 		INNER JOIN sia_addresses sa ON (se.address_id = sa.id)
 		WHERE sa.sia_address = ? AND se.maturity_height <= ? AND se.spent_index_id IS NULL`
@@ -101,21 +101,21 @@ func (s *Store) AddressSiacoinOutputs(address types.Address, tpoolSpent []types.
 		defer rows.Close()
 
 		for rows.Next() {
-			siacoin, err := scanUnspentSiacoinElement(rows, basis.Height)
+			bigfile, err := scanUnspentBigFileElement(rows, basis.Height)
 			if err != nil {
-				return fmt.Errorf("failed to scan siacoin element: %w", err)
+				return fmt.Errorf("failed to scan bigfile element: %w", err)
 			}
 
-			siacoins = append(siacoins, siacoin)
+			bigfiles = append(bigfiles, bigfile)
 		}
 		if err := rows.Err(); err != nil {
 			return err
 		}
 
-		// retrieve the merkle proofs for the siacoin elements
+		// retrieve the merkle proofs for the bigfile elements
 		if s.indexMode == wallet.IndexModeFull {
-			indices := make([]uint64, len(siacoins))
-			for i, se := range siacoins {
+			indices := make([]uint64, len(bigfiles))
+			for i, se := range bigfiles {
 				indices[i] = se.StateElement.LeafIndex
 			}
 			proofs, err := fillElementProofs(tx, indices)
@@ -123,7 +123,7 @@ func (s *Store) AddressSiacoinOutputs(address types.Address, tpoolSpent []types.
 				return fmt.Errorf("failed to fill element proofs: %w", err)
 			}
 			for i, proof := range proofs {
-				siacoins[i].StateElement.MerkleProof = proof
+				bigfiles[i].StateElement.MerkleProof = proof
 			}
 		}
 		return nil
@@ -194,29 +194,29 @@ func (s *Store) AddressSiafundOutputs(address types.Address, tpoolSpent []types.
 }
 
 // AnnotateV1Events annotates a list of unconfirmed transactions with
-// relevant addresses and siacoin/siafund elements.
+// relevant addresses and bigfile/siafund elements.
 func (s *Store) AnnotateV1Events(index types.ChainIndex, timestamp time.Time, v1 []types.Transaction) (annotated []wallet.Event, err error) {
 	err = s.transaction(func(tx *txn) error {
-		siacoinElementStmt, err := tx.Prepare(`SELECT se.id, se.siacoin_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.sia_address
-		FROM siacoin_elements se
+		bigfileElementStmt, err := tx.Prepare(`SELECT se.id, se.bigfile_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.sia_address
+		FROM bigfile_elements se
 		INNER JOIN sia_addresses sa ON (se.address_id = sa.id)
 		WHERE se.id=$1`)
 		if err != nil {
-			return fmt.Errorf("failed to prepare siacoin statement: %w", err)
+			return fmt.Errorf("failed to prepare bigfile statement: %w", err)
 		}
-		defer siacoinElementStmt.Close()
+		defer bigfileElementStmt.Close()
 
-		siacoinElementCache := make(map[types.SiacoinOutputID]types.SiacoinElement)
-		fetchSiacoinElement := func(id types.SiacoinOutputID) (types.SiacoinElement, error) {
-			if se, ok := siacoinElementCache[id]; ok {
+		bigfileElementCache := make(map[types.BigFileOutputID]types.BigFileElement)
+		fetchBigFileElement := func(id types.BigFileOutputID) (types.BigFileElement, error) {
+			if se, ok := bigfileElementCache[id]; ok {
 				return se, nil
 			}
 
-			se, err := scanSiacoinElement(siacoinElementStmt.QueryRow(encode(id)))
+			se, err := scanBigFileElement(bigfileElementStmt.QueryRow(encode(id)))
 			if err != nil {
-				return types.SiacoinElement{}, fmt.Errorf("failed to fetch siacoin element: %w", err)
+				return types.BigFileElement{}, fmt.Errorf("failed to fetch bigfile element: %w", err)
 			}
-			siacoinElementCache[id] = se
+			bigfileElementCache[id] = se
 			return se, nil
 		}
 
@@ -260,27 +260,27 @@ func (s *Store) AnnotateV1Events(index types.ChainIndex, timestamp time.Time, v1
 				Transaction: txn,
 			}
 
-			for _, input := range txn.SiacoinInputs {
-				// fetch the siacoin element
-				sce, err := fetchSiacoinElement(input.ParentID)
+			for _, input := range txn.BigFileInputs {
+				// fetch the bigfile element
+				sce, err := fetchBigFileElement(input.ParentID)
 				if errors.Is(err, sql.ErrNoRows) {
 					continue // ignore elements that are not found
 				} else if err != nil {
-					return fmt.Errorf("failed to fetch siacoin element %q: %w", input.ParentID, err)
+					return fmt.Errorf("failed to fetch bigfile element %q: %w", input.ParentID, err)
 				}
-				ev.SpentSiacoinElements = append(ev.SpentSiacoinElements, sce)
+				ev.SpentBigFileElements = append(ev.SpentBigFileElements, sce)
 				relevant = true
 			}
 
-			for i, output := range txn.SiacoinOutputs {
-				sce := types.SiacoinElement{
-					ID: txn.SiacoinOutputID(i),
+			for i, output := range txn.BigFileOutputs {
+				sce := types.BigFileElement{
+					ID: txn.BigFileOutputID(i),
 					StateElement: types.StateElement{
 						LeafIndex: types.UnassignedLeafIndex,
 					},
-					SiacoinOutput: output,
+					BigFileOutput: output,
 				}
-				siacoinElementCache[sce.ID] = sce
+				bigfileElementCache[sce.ID] = sce
 				relevant = true
 			}
 

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sync"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/wallet"
 	"lukechampine.com/frand"
 )
 
@@ -96,7 +96,7 @@ func (sav *SeedAddressVault) SignTransaction(cs consensus.State, txn *types.Tran
 
 	if len(toSign) == 0 {
 		// lazy mode: add standard sigs for every input we own
-		for _, sci := range txn.SiacoinInputs {
+		for _, sci := range txn.BigFileInputs {
 			if index, ok := sav.addrs[sci.UnlockConditions.UnlockHash()]; ok {
 				txn.Signatures = append(txn.Signatures, StandardTransactionSignature(types.Hash256(sci.ParentID)))
 				SignTransaction(cs, txn, len(txn.Signatures)-1, sav.seed.PrivateKey(index))
@@ -112,7 +112,7 @@ func (sav *SeedAddressVault) SignTransaction(cs consensus.State, txn *types.Tran
 	}
 
 	sigAddr := func(id types.Hash256) (types.Address, bool) {
-		for _, sci := range txn.SiacoinInputs {
+		for _, sci := range txn.BigFileInputs {
 			if types.Hash256(sci.ParentID) == id {
 				return sci.UnlockConditions.UnlockHash(), true
 			}

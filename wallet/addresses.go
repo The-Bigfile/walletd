@@ -3,7 +3,7 @@ package wallet
 import (
 	"time"
 
-	"go.sia.tech/core/types"
+	"go.thebigfile.com/core/types"
 )
 
 // AddressBalance returns the balance of a single address.
@@ -11,28 +11,28 @@ func (m *Manager) AddressBalance(address types.Address) (balance Balance, err er
 	return m.store.AddressBalance(address)
 }
 
-// AddressSiacoinOutputs returns the unspent siacoin outputs for an address.
-func (m *Manager) AddressSiacoinOutputs(address types.Address, usePool bool, offset, limit int) ([]UnspentSiacoinElement, types.ChainIndex, error) {
+// AddressBigFileOutputs returns the unspent bigfile outputs for an address.
+func (m *Manager) AddressBigFileOutputs(address types.Address, usePool bool, offset, limit int) ([]UnspentBigFileElement, types.ChainIndex, error) {
 	if !usePool {
-		return m.store.AddressSiacoinOutputs(address, nil, offset, limit)
+		return m.store.AddressBigFileOutputs(address, nil, offset, limit)
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	spent := m.poolAddressSCSpent[address]
-	var created []UnspentSiacoinElement
+	var created []UnspentBigFileElement
 	for _, sce := range m.poolSCCreated {
-		if sce.SiacoinOutput.Address != address {
+		if sce.BigFileOutput.Address != address {
 			continue
 		}
 
-		created = append(created, UnspentSiacoinElement{
-			SiacoinElement: sce,
+		created = append(created, UnspentBigFileElement{
+			BigFileElement: sce,
 		})
 	}
 
-	outputs, basis, err := m.store.AddressSiacoinOutputs(address, spent, offset, limit)
+	outputs, basis, err := m.store.AddressBigFileOutputs(address, spent, offset, limit)
 	if err != nil {
 		return nil, types.ChainIndex{}, err
 	} else if len(outputs) == limit {
@@ -85,12 +85,12 @@ func (m *Manager) AddressUnconfirmedEvents(address types.Address) ([]Event, erro
 	v1, v2 := m.chain.PoolTransactions(), m.chain.V2PoolTransactions()
 
 	relevantV1Txn := func(txn types.Transaction) bool {
-		for _, output := range txn.SiacoinOutputs {
+		for _, output := range txn.BigFileOutputs {
 			if output.Address == address {
 				return true
 			}
 		}
-		for _, input := range txn.SiacoinInputs {
+		for _, input := range txn.BigFileInputs {
 			if input.UnlockConditions.UnlockHash() == address {
 				return true
 			}
@@ -126,13 +126,13 @@ func (m *Manager) AddressUnconfirmedEvents(address types.Address) ([]Event, erro
 	}
 
 	relevantV2Txn := func(txn types.V2Transaction) bool {
-		for _, output := range txn.SiacoinOutputs {
+		for _, output := range txn.BigFileOutputs {
 			if output.Address == address {
 				return true
 			}
 		}
-		for _, input := range txn.SiacoinInputs {
-			if input.Parent.SiacoinOutput.Address == address {
+		for _, input := range txn.BigFileInputs {
+			if input.Parent.BigFileOutput.Address == address {
 				return true
 			}
 		}

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"go.sia.tech/coreutils/syncer"
+	"go.thebigfile.com/coreutils/syncer"
 	"go.uber.org/zap"
 )
 
