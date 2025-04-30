@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"go.sia.tech/jape"
+	"go.thebigfile.com/jape"
 	"go.thebigfile.com/core/consensus"
 	"go.thebigfile.com/core/types"
 	"go.thebigfile.com/coreutils/chain"

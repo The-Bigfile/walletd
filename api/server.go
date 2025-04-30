@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"go.sia.tech/jape"
+	"go.thebigfile.com/jape"
 	"go.uber.org/zap"
 
 	"go.thebigfile.com/core/consensus"
