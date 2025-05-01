@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"go.sia.tech/jape"
+	"go.thebigfile.com/jape"
 	"go.thebigfile.com/core/types"
 	"go.thebigfile.com/coreutils"
 	"go.thebigfile.com/walletd/v2/api"
