@@ -45,10 +45,10 @@ go.sia.tech/web v0.0.0-20240610131903-5611d44a533e h1:oKDz6rUExM4a4o6n/EXDppsEka
 go.sia.tech/web v0.0.0-20240610131903-5611d44a533e/go.mod h1:4nyDlycPKxTlCqvOeRO0wUfXxyzWCEE7+2BRrdNqvWk=
 go.sia.tech/web/walletd v0.29.2 h1:bi0A4ZDROEAmh3CtJ+fJ/3dXfobc37kjqmnmJTNPmM4=
 go.sia.tech/web/walletd v0.29.2/go.mod h1:VkWPLolV88EeAlGzTxSktwQRQ5+MZdkWan0N4d5aCZ8=
-go.thebigfile.com/core v1.0.2 h1:stOTdX1yld7frTyoYAbRFsCBOcfbLHmyCJ3JuxikJeQ=
-go.thebigfile.com/core v1.0.2/go.mod h1:4lg9eAT9pYhUmYpTq6S+e61wPxYjO57dZaBEEApASKA=
-go.thebigfile.com/coreutils v0.0.7 h1:mUGaRkoAQxDsH2ZEsC5CwNKjnMIMr7I6BI+eVDq9N/0=
-go.thebigfile.com/coreutils v0.0.7/go.mod h1:Y5YYUe5sKew0qk1ExCE3xBZ0PCHdpg23KNFKRRCiVkE=
+go.thebigfile.com/core v1.0.7 h1:mJ7zo5PqKKelQZ0dOK2bT6l/z2vecLCIO69y9xKOTSg=
+go.thebigfile.com/core v1.0.7/go.mod h1:cwXSPP2/BU2cQUNriSdIaSZcWeHT6b8TOOXMfa5pBmc=
+go.thebigfile.com/coreutils v1.0.1 h1:JA4GWShyUDa5nTNOgZKmFQuJYv2H8S6wGb5+2/M+Ru0=
+go.thebigfile.com/coreutils v1.0.1/go.mod h1:yoI6p+yvVPjxcd0ohjI+58/DSZ2xwmRmqEP3jrg6yVk=
 go.thebigfile.com/jape v0.0.1 h1:1gVvMj0Tg9hx1cWePafoSm+Agp+Z2FEr/1g0YaAys8w=
 go.thebigfile.com/jape v0.0.1/go.mod h1:H8McInjuYJXOLomkrlQBbH0ClzT91zOrZDKex2291bw=
 go.thebigfile.com/mux v0.0.1 h1:BfsWkNBv648G/2ZGQ9gQefrdMvNydY7kIK+Jtdm0o1M=
