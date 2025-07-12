@@ -18,7 +18,7 @@ RUN go build -o bin/ -tags='netgo timetzdata' -trimpath -a -ldflags '-s -w -link
 FROM debian:bookworm-slim
 LABEL maintainer="The Sia Foundation <info@sia.tech>" \
     org.opencontainers.image.description.vendor="The Sia Foundation" \
-    org.opencontainers.image.description="A walletd container - send and receive Siacoins and Siafunds" \
+    org.opencontainers.image.description="A walletd container - send and receive Bigfiles and Bigfunds" \
     org.opencontainers.image.source="https://github.com/SiaFoundation/walletd" \
     org.opencontainers.image.licenses=MIT
 

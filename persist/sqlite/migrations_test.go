@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.sia.tech/core/types"
+	"go.thebigfile.com/core/types"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -18,45 +18,45 @@ const initialSchema = `CREATE TABLE chain_indices (
 );
 CREATE INDEX chain_indices_height ON chain_indices (block_id, height);
 
-CREATE TABLE sia_addresses (
+CREATE TABLE bigfile_addresses (
 	id INTEGER PRIMARY KEY,
-	sia_address BLOB UNIQUE NOT NULL,
-	siacoin_balance BLOB NOT NULL,
-	immature_siacoin_balance BLOB NOT NULL,
-	siafund_balance INTEGER NOT NULL
+	bigfile_address BLOB UNIQUE NOT NULL,
+	bigfile_balance BLOB NOT NULL,
+	immature_bigfile_balance BLOB NOT NULL,
+	bigfund_balance INTEGER NOT NULL
 );
 
-CREATE TABLE siacoin_elements (
+CREATE TABLE bigfile_elements (
 	id BLOB PRIMARY KEY,
-	siacoin_value BLOB NOT NULL,
+	bigfile_value BLOB NOT NULL,
 	merkle_proof BLOB NOT NULL,
 	leaf_index INTEGER NOT NULL,
 	maturity_height INTEGER NOT NULL, /* stored as int64 for easier querying */
-	address_id INTEGER NOT NULL REFERENCES sia_addresses (id),
+	address_id INTEGER NOT NULL REFERENCES bigfile_addresses (id),
 	matured BOOLEAN NOT NULL, /* tracks whether the value has been added to the address balance */
 	chain_index_id INTEGER NOT NULL REFERENCES chain_indices (id),
 	spent_index_id INTEGER REFERENCES chain_indices (id) /* soft delete */
 );
-CREATE INDEX siacoin_elements_address_id ON siacoin_elements (address_id);
-CREATE INDEX siacoin_elements_maturity_height_matured ON siacoin_elements (maturity_height, matured);
-CREATE INDEX siacoin_elements_chain_index_id ON siacoin_elements (chain_index_id);
-CREATE INDEX siacoin_elements_spent_index_id ON siacoin_elements (spent_index_id);
-CREATE INDEX siacoin_elements_address_id_spent_index_id ON siacoin_elements(address_id, spent_index_id);
+CREATE INDEX bigfile_elements_address_id ON bigfile_elements (address_id);
+CREATE INDEX bigfile_elements_maturity_height_matured ON bigfile_elements (maturity_height, matured);
+CREATE INDEX bigfile_elements_chain_index_id ON bigfile_elements (chain_index_id);
+CREATE INDEX bigfile_elements_spent_index_id ON bigfile_elements (spent_index_id);
+CREATE INDEX bigfile_elements_address_id_spent_index_id ON bigfile_elements(address_id, spent_index_id);
 
-CREATE TABLE siafund_elements (
+CREATE TABLE bigfund_elements (
 	id BLOB PRIMARY KEY,
 	claim_start BLOB NOT NULL,
 	merkle_proof BLOB NOT NULL,
 	leaf_index INTEGER NOT NULL,
-	siafund_value INTEGER NOT NULL,
-	address_id INTEGER NOT NULL REFERENCES sia_addresses (id),
+	bigfund_value INTEGER NOT NULL,
+	address_id INTEGER NOT NULL REFERENCES bigfile_addresses (id),
 	chain_index_id INTEGER NOT NULL REFERENCES chain_indices (id),
 	spent_index_id INTEGER REFERENCES chain_indices (id) /* soft delete */
 );
-CREATE INDEX siafund_elements_address_id ON siafund_elements (address_id);
-CREATE INDEX siafund_elements_chain_index_id ON siafund_elements (chain_index_id);
-CREATE INDEX siafund_elements_spent_index_id ON siafund_elements (spent_index_id);
-CREATE INDEX siafund_elements_address_id_spent_index_id ON siafund_elements(address_id, spent_index_id);
+CREATE INDEX bigfund_elements_address_id ON bigfund_elements (address_id);
+CREATE INDEX bigfund_elements_chain_index_id ON bigfund_elements (chain_index_id);
+CREATE INDEX bigfund_elements_spent_index_id ON bigfund_elements (spent_index_id);
+CREATE INDEX bigfund_elements_address_id_spent_index_id ON bigfund_elements(address_id, spent_index_id);
 
 CREATE TABLE state_tree (
 	row INTEGER,
@@ -78,7 +78,7 @@ CREATE INDEX events_chain_index_id ON events (chain_index_id);
 
 CREATE TABLE event_addresses (
 	event_id INTEGER NOT NULL REFERENCES events (id) ON DELETE CASCADE,
-	address_id INTEGER NOT NULL REFERENCES sia_addresses (id),
+	address_id INTEGER NOT NULL REFERENCES bigfile_addresses (id),
 	PRIMARY KEY (event_id, address_id)
 );
 CREATE INDEX event_addresses_event_id_idx ON event_addresses (event_id);
@@ -95,7 +95,7 @@ CREATE TABLE wallets (
 
 CREATE TABLE wallet_addresses (
 	wallet_id INTEGER NOT NULL REFERENCES wallets (id),
-	address_id INTEGER NOT NULL REFERENCES sia_addresses (id),
+	address_id INTEGER NOT NULL REFERENCES bigfile_addresses (id),
 	description TEXT NOT NULL,
 	spend_policy BLOB,
 	extra_data BLOB,

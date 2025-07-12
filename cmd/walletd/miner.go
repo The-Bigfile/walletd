@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"time"
 
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils"
-	"go.sia.tech/walletd/v2/api"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils"
+	"go.thebigfile.com/walletd/v2/api"
 	"lukechampine.com/frand"
 )
 
@@ -34,7 +34,7 @@ func runCPUMiner(c *api.Client, minerAddr types.Address, n int) {
 			ParentID:     cs.Index.ID,
 			Nonce:        cs.NonceFactor() * frand.Uint64n(100),
 			Timestamp:    types.CurrentTimestamp(),
-			MinerPayouts: []types.SiacoinOutput{{Address: minerAddr, Value: cs.BlockReward()}},
+			MinerPayouts: []types.BigfileOutput{{Address: minerAddr, Value: cs.BlockReward()}},
 			Transactions: txns,
 		}
 		for _, txn := range txns {

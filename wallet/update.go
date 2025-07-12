@@ -3,8 +3,8 @@ package wallet
 import (
 	"fmt"
 
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/chain"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/chain"
 	"go.uber.org/zap"
 )
 
@@ -27,17 +27,17 @@ type (
 		Balance
 	}
 
-	// SpentSiacoinElement pairs a spent siacoin element with the ID of the
+	// SpentBigfileElement pairs a spent bigfile element with the ID of the
 	// transaction that spent it.
-	SpentSiacoinElement struct {
-		types.SiacoinElement
+	SpentBigfileElement struct {
+		types.BigfileElement
 		EventID types.TransactionID
 	}
 
-	// SpentSiafundElement pairs a spent siafund element with the ID of the
+	// SpentBigfundElement pairs a spent bigfund element with the ID of the
 	// transaction that spent it.
-	SpentSiafundElement struct {
-		types.SiafundElement
+	SpentBigfundElement struct {
+		types.BigfundElement
 		EventID types.TransactionID
 	}
 
@@ -46,20 +46,20 @@ type (
 	AppliedState struct {
 		NumLeaves              uint64
 		Events                 []Event
-		CreatedSiacoinElements []types.SiacoinElement
-		SpentSiacoinElements   []SpentSiacoinElement
-		CreatedSiafundElements []types.SiafundElement
-		SpentSiafundElements   []SpentSiafundElement
+		CreatedBigfileElements []types.BigfileElement
+		SpentBigfileElements   []SpentBigfileElement
+		CreatedBigfundElements []types.BigfundElement
+		SpentBigfundElements   []SpentBigfundElement
 	}
 
 	// RevertedState contains all state changes made to a store after reverting
 	// a chain update.
 	RevertedState struct {
 		NumLeaves              uint64
-		UnspentSiacoinElements []types.SiacoinElement
-		DeletedSiacoinElements []types.SiacoinElement
-		UnspentSiafundElements []types.SiafundElement
-		DeletedSiafundElements []types.SiafundElement
+		UnspentBigfileElements []types.BigfileElement
+		DeletedBigfileElements []types.BigfileElement
+		UnspentBigfundElements []types.BigfundElement
+		DeletedBigfundElements []types.BigfundElement
 	}
 
 	// A TreeNodeUpdate contains the hash of a Merkle tree node and its row and
@@ -109,66 +109,66 @@ func applyChainUpdate(tx UpdateTx, cau chain.ApplyUpdate, indexMode IndexMode) e
 	spentEventIDs := make(map[types.Hash256]types.TransactionID)
 	for _, txn := range cau.Block.Transactions {
 		txnID := txn.ID()
-		for _, input := range txn.SiacoinInputs {
+		for _, input := range txn.BigfileInputs {
 			spentEventIDs[types.Hash256(input.ParentID)] = txnID
 		}
-		for _, input := range txn.SiafundInputs {
+		for _, input := range txn.BigfundInputs {
 			spentEventIDs[types.Hash256(input.ParentID)] = txnID
 		}
 	}
 	for _, txn := range cau.Block.V2Transactions() {
 		txnID := txn.ID()
-		for _, input := range txn.SiacoinInputs {
+		for _, input := range txn.BigfileInputs {
 			spentEventIDs[types.Hash256(input.Parent.ID)] = txnID
 		}
-		for _, input := range txn.SiafundInputs {
+		for _, input := range txn.BigfundInputs {
 			spentEventIDs[types.Hash256(input.Parent.ID)] = txnID
 		}
 	}
 
-	// add new siacoin elements to the store
-	for _, sced := range cau.SiacoinElementDiffs() {
-		sce := sced.SiacoinElement
-		if (sced.Created && sced.Spent) || sce.SiacoinOutput.Value.IsZero() {
+	// add new bigfile elements to the store
+	for _, biged := range cau.BigfileElementDiffs() {
+		bige := biged.BigfileElement
+		if (biged.Created && biged.Spent) || bige.BigfileOutput.Value.IsZero() {
 			continue
-		} else if relevant, err := tx.AddressRelevant(sce.SiacoinOutput.Address); err != nil {
+		} else if relevant, err := tx.AddressRelevant(bige.BigfileOutput.Address); err != nil {
 			panic(err)
 		} else if !relevant {
 			continue
 		}
-		if sced.Spent {
-			spentTxnID, ok := spentEventIDs[types.Hash256(sce.ID)]
+		if biged.Spent {
+			spentTxnID, ok := spentEventIDs[types.Hash256(bige.ID)]
 			if !ok {
-				panic(fmt.Errorf("missing transaction ID for spent siacoin element %v", sce.ID))
+				panic(fmt.Errorf("missing transaction ID for spent bigfile element %v", bige.ID))
 			}
-			applied.SpentSiacoinElements = append(applied.SpentSiacoinElements, SpentSiacoinElement{
-				SiacoinElement: sce,
+			applied.SpentBigfileElements = append(applied.SpentBigfileElements, SpentBigfileElement{
+				BigfileElement: bige,
 				EventID:        spentTxnID,
 			})
 		} else {
-			applied.CreatedSiacoinElements = append(applied.CreatedSiacoinElements, sce)
+			applied.CreatedBigfileElements = append(applied.CreatedBigfileElements, bige)
 		}
 	}
-	for _, sfed := range cau.SiafundElementDiffs() {
-		sfe := sfed.SiafundElement
-		if (sfed.Created && sfed.Spent) || sfe.SiafundOutput.Value == 0 {
+	for _, sfed := range cau.BigfundElementDiffs() {
+		bfe := sfed.BigfundElement
+		if (sfed.Created && sfed.Spent) || bfe.BigfundOutput.Value == 0 {
 			continue
-		} else if relevant, err := tx.AddressRelevant(sfe.SiafundOutput.Address); err != nil {
+		} else if relevant, err := tx.AddressRelevant(bfe.BigfundOutput.Address); err != nil {
 			panic(err)
 		} else if !relevant {
 			continue
 		}
 		if sfed.Spent {
-			spentTxnID, ok := spentEventIDs[types.Hash256(sfe.ID)]
+			spentTxnID, ok := spentEventIDs[types.Hash256(bfe.ID)]
 			if !ok {
-				panic(fmt.Errorf("missing transaction ID for spent siafund element %v", sfe.ID))
+				panic(fmt.Errorf("missing transaction ID for spent bigfund element %v", bfe.ID))
 			}
-			applied.SpentSiafundElements = append(applied.SpentSiafundElements, SpentSiafundElement{
-				SiafundElement: sfe,
+			applied.SpentBigfundElements = append(applied.SpentBigfundElements, SpentBigfundElement{
+				BigfundElement: bfe,
 				EventID:        spentTxnID,
 			})
 		} else {
-			applied.CreatedSiafundElements = append(applied.CreatedSiafundElements, sfe)
+			applied.CreatedBigfundElements = append(applied.CreatedBigfundElements, bfe)
 		}
 	}
 
@@ -196,57 +196,57 @@ func revertChainUpdate(tx UpdateTx, cru chain.RevertUpdate, revertedIndex types.
 		NumLeaves: cru.State.Elements.NumLeaves,
 	}
 
-	// determine which siacoin and siafund elements are ephemeral
+	// determine which bigfile and bigfund elements are ephemeral
 	//
 	// note: I thought we could use LeafIndex == EphemeralLeafIndex, but
 	// it seems to be set before the subscriber is called.
 	created := make(map[types.Hash256]bool)
 	ephemeral := make(map[types.Hash256]bool)
 	for _, txn := range cru.Block.Transactions {
-		for i := range txn.SiacoinOutputs {
-			created[types.Hash256(txn.SiacoinOutputID(i))] = true
+		for i := range txn.BigfileOutputs {
+			created[types.Hash256(txn.BigfileOutputID(i))] = true
 		}
-		for _, input := range txn.SiacoinInputs {
+		for _, input := range txn.BigfileInputs {
 			ephemeral[types.Hash256(input.ParentID)] = created[types.Hash256(input.ParentID)]
 		}
-		for i := range txn.SiafundOutputs {
-			created[types.Hash256(txn.SiafundOutputID(i))] = true
+		for i := range txn.BigfundOutputs {
+			created[types.Hash256(txn.BigfundOutputID(i))] = true
 		}
-		for _, input := range txn.SiafundInputs {
+		for _, input := range txn.BigfundInputs {
 			ephemeral[types.Hash256(input.ParentID)] = created[types.Hash256(input.ParentID)]
 		}
 	}
 
-	for _, sced := range cru.SiacoinElementDiffs() {
-		sce := sced.SiacoinElement
-		if (sced.Created && sced.Spent) || sce.SiacoinOutput.Value.IsZero() {
+	for _, biged := range cru.BigfileElementDiffs() {
+		bige := biged.BigfileElement
+		if (biged.Created && biged.Spent) || bige.BigfileOutput.Value.IsZero() {
 			continue
-		} else if relevant, err := tx.AddressRelevant(sce.SiacoinOutput.Address); err != nil {
+		} else if relevant, err := tx.AddressRelevant(bige.BigfileOutput.Address); err != nil {
 			panic(err)
 		} else if !relevant {
 			continue
 		}
-		if sced.Spent {
-			// re-add any spent siacoin elements
-			reverted.UnspentSiacoinElements = append(reverted.UnspentSiacoinElements, sce)
+		if biged.Spent {
+			// re-add any spent bigfile elements
+			reverted.UnspentBigfileElements = append(reverted.UnspentBigfileElements, bige)
 		} else {
-			// delete any created siacoin elements
-			reverted.DeletedSiacoinElements = append(reverted.DeletedSiacoinElements, sce)
+			// delete any created bigfile elements
+			reverted.DeletedBigfileElements = append(reverted.DeletedBigfileElements, bige)
 		}
 	}
-	for _, sfed := range cru.SiafundElementDiffs() {
-		sfe := sfed.SiafundElement
-		if (sfed.Created && sfed.Spent) || sfe.SiafundOutput.Value == 0 {
+	for _, sfed := range cru.BigfundElementDiffs() {
+		bfe := sfed.BigfundElement
+		if (sfed.Created && sfed.Spent) || bfe.BigfundOutput.Value == 0 {
 			continue
-		} else if relevant, err := tx.AddressRelevant(sfe.SiafundOutput.Address); err != nil {
+		} else if relevant, err := tx.AddressRelevant(bfe.BigfundOutput.Address); err != nil {
 			panic(err)
 		} else if !relevant {
 			continue
 		}
 		if sfed.Spent {
-			reverted.UnspentSiafundElements = append(reverted.UnspentSiafundElements, sfe)
+			reverted.UnspentBigfundElements = append(reverted.UnspentBigfundElements, bfe)
 		} else {
-			reverted.DeletedSiafundElements = append(reverted.DeletedSiafundElements, sfe)
+			reverted.DeletedBigfundElements = append(reverted.DeletedBigfundElements, bfe)
 		}
 	}
 

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"go.sia.tech/core/types"
-	"go.sia.tech/walletd/v2/internal/testutil"
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/walletd/v2/internal/testutil"
+	"go.thebigfile.com/walletd/v2/wallet"
 	"go.uber.org/zap/zaptest"
 )
 

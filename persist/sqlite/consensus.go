@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/chain"
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/chain"
+	"go.thebigfile.com/walletd/v2/wallet"
 	"go.uber.org/zap"
 )
 
@@ -35,26 +35,26 @@ func (ut *updateTx) UpdateStateElementProofs(update wallet.ProofUpdater) error {
 		panic("UpdateStateElementProofs called in full index mode")
 	}
 
-	se, err := getSiacoinStateElements(ut.tx)
+	se, err := getBigfileStateElements(ut.tx)
 	if err != nil {
-		return fmt.Errorf("failed to get siacoin state elements: %w", err)
+		return fmt.Errorf("failed to get bigfile state elements: %w", err)
 	}
 	for i := range se {
 		update.UpdateElementProof(&se[i].StateElement)
 	}
-	if err := updateSiacoinStateElements(ut.tx, se); err != nil {
-		return fmt.Errorf("failed to update siacoin state elements: %w", err)
+	if err := updateBigfileStateElements(ut.tx, se); err != nil {
+		return fmt.Errorf("failed to update bigfile state elements: %w", err)
 	}
 
-	sfe, err := getSiafundStateElements(ut.tx)
+	bfe, err := getBigfundStateElements(ut.tx)
 	if err != nil {
-		return fmt.Errorf("failed to get siafund state elements: %w", err)
+		return fmt.Errorf("failed to get bigfund state elements: %w", err)
 	}
-	for i := range sfe {
-		update.UpdateElementProof(&sfe[i].StateElement)
+	for i := range bfe {
+		update.UpdateElementProof(&bfe[i].StateElement)
 	}
-	if err := updateSiafundStateElements(ut.tx, sfe); err != nil {
-		return fmt.Errorf("failed to update siafund state elements: %w", err)
+	if err := updateBigfundStateElements(ut.tx, bfe); err != nil {
+		return fmt.Errorf("failed to update bigfund state elements: %w", err)
 	}
 	return nil
 }
@@ -89,7 +89,7 @@ func (ut *updateTx) AddressRelevant(addr types.Address) (bool, error) {
 	}
 
 	var id int64
-	err := ut.tx.QueryRow(`SELECT id FROM sia_addresses WHERE sia_address=$1`, encode(addr)).Scan(&id)
+	err := ut.tx.QueryRow(`SELECT id FROM bigfile_addresses WHERE bigfile_address=$1`, encode(addr)).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		ut.relevantAddresses[addr] = false
 		return false, nil
@@ -101,7 +101,7 @@ func (ut *updateTx) AddressRelevant(addr types.Address) (bool, error) {
 }
 
 func (ut *updateTx) AddressBalance(addr types.Address) (balance wallet.Balance, err error) {
-	err = ut.tx.QueryRow(`SELECT siacoin_balance, immature_siacoin_balance, siafund_balance FROM sia_addresses WHERE sia_address=$1`, encode(addr)).Scan(decode(&balance.Siacoins), decode(&balance.ImmatureSiacoins), &balance.Siafunds)
+	err = ut.tx.QueryRow(`SELECT bigfile_balance, immature_bigfile_balance, bigfund_balance FROM bigfile_addresses WHERE bigfile_address=$1`, encode(addr)).Scan(decode(&balance.Bigfiles), decode(&balance.ImmatureBigfiles), &balance.Bigfunds)
 	return
 }
 
@@ -113,8 +113,8 @@ func (ut *updateTx) ApplyIndex(index types.ChainIndex, state wallet.AppliedState
 		return fmt.Errorf("failed to revert orphans: %w", err)
 	}
 
-	if err := applyMatureSiacoinBalance(tx, index, log.Named("applyMatureSiacoinBalance")); err != nil {
-		return fmt.Errorf("failed to apply mature siacoin balance: %w", err)
+	if err := applyMatureBigfileBalance(tx, index, log.Named("applyMatureBigfileBalance")); err != nil {
+		return fmt.Errorf("failed to apply mature bigfile balance: %w", err)
 	}
 
 	var indexID int64
@@ -126,16 +126,16 @@ func (ut *updateTx) ApplyIndex(index types.ChainIndex, state wallet.AppliedState
 		return fmt.Errorf("failed to add events: %w", err)
 	}
 
-	if err := spendSiacoinElements(tx, state.SpentSiacoinElements, indexID); err != nil {
-		return fmt.Errorf("failed to spend siacoin elements: %w", err)
-	} else if err := addSiacoinElements(tx, state.CreatedSiacoinElements, indexID, ut.indexMode, log.Named("addSiacoinElements")); err != nil {
-		return fmt.Errorf("failed to add siacoin elements: %w", err)
+	if err := spendBigfileElements(tx, state.SpentBigfileElements, indexID); err != nil {
+		return fmt.Errorf("failed to spend bigfile elements: %w", err)
+	} else if err := addBigfileElements(tx, state.CreatedBigfileElements, indexID, ut.indexMode, log.Named("addBigfileElements")); err != nil {
+		return fmt.Errorf("failed to add bigfile elements: %w", err)
 	}
 
-	if err := spendSiafundElements(tx, state.SpentSiafundElements, indexID); err != nil {
-		return fmt.Errorf("failed to spend siafund elements: %w", err)
-	} else if err := addSiafundElements(tx, state.CreatedSiafundElements, indexID, ut.indexMode, log.Named("addSiafundElements")); err != nil {
-		return fmt.Errorf("failed to add siafund elements: %w", err)
+	if err := spendBigfundElements(tx, state.SpentBigfundElements, indexID); err != nil {
+		return fmt.Errorf("failed to spend bigfund elements: %w", err)
+	} else if err := addBigfundElements(tx, state.CreatedBigfundElements, indexID, ut.indexMode, log.Named("addBigfundElements")); err != nil {
+		return fmt.Errorf("failed to add bigfund elements: %w", err)
 	}
 
 	return nil
@@ -144,22 +144,22 @@ func (ut *updateTx) ApplyIndex(index types.ChainIndex, state wallet.AppliedState
 func (ut *updateTx) RevertIndex(index types.ChainIndex, state wallet.RevertedState) error {
 	tx := ut.tx
 
-	if err := revertSpentSiacoinElements(tx, state.UnspentSiacoinElements); err != nil {
-		return fmt.Errorf("failed to revert spent siacoin elements: %w", err)
-	} else if err := removeSiacoinElements(tx, state.DeletedSiacoinElements); err != nil {
-		return fmt.Errorf("failed to remove siacoin elements: %w", err)
+	if err := revertSpentBigfileElements(tx, state.UnspentBigfileElements); err != nil {
+		return fmt.Errorf("failed to revert spent bigfile elements: %w", err)
+	} else if err := removeBigfileElements(tx, state.DeletedBigfileElements); err != nil {
+		return fmt.Errorf("failed to remove bigfile elements: %w", err)
 	}
 
-	if err := revertSpentSiafundElements(tx, state.UnspentSiafundElements); err != nil {
-		return fmt.Errorf("failed to revert spent siafund elements: %w", err)
-	} else if err := removeSiafundElements(tx, state.DeletedSiafundElements); err != nil {
-		return fmt.Errorf("failed to remove siafund elements: %w", err)
+	if err := revertSpentBigfundElements(tx, state.UnspentBigfundElements); err != nil {
+		return fmt.Errorf("failed to revert spent bigfund elements: %w", err)
+	} else if err := removeBigfundElements(tx, state.DeletedBigfundElements); err != nil {
+		return fmt.Errorf("failed to remove bigfund elements: %w", err)
 	}
 
 	if err := revertEvents(tx, index); err != nil {
 		return fmt.Errorf("failed to revert events: %w", err)
-	} else if err := revertMatureSiacoinBalance(tx, index); err != nil {
-		return fmt.Errorf("failed to revert mature siacoin balance: %w", err)
+	} else if err := revertMatureBigfileBalance(tx, index); err != nil {
+		return fmt.Errorf("failed to revert mature bigfile balance: %w", err)
 	}
 	return nil
 }
@@ -203,16 +203,16 @@ func (s *Store) UpdateChainState(reverted []chain.RevertUpdate, applied []chain.
 		if state.Index.Height > s.spentElementRetentionBlocks {
 			pruneHeight := state.Index.Height - s.spentElementRetentionBlocks
 
-			siacoins, err := pruneSpentSiacoinElements(tx, pruneHeight)
+			bigfiles, err := pruneSpentBigfileElements(tx, pruneHeight)
 			if err != nil {
-				return fmt.Errorf("failed to cleanup siacoin elements: %w", err)
+				return fmt.Errorf("failed to cleanup bigfile elements: %w", err)
 			}
 
-			siafunds, err := pruneSpentSiafundElements(tx, pruneHeight)
+			bigfunds, err := pruneSpentBigfundElements(tx, pruneHeight)
 			if err != nil {
-				return fmt.Errorf("failed to cleanup siafund elements: %w", err)
+				return fmt.Errorf("failed to cleanup bigfund elements: %w", err)
 			}
-			log.Debug("pruned elements", zap.Int64("siacoins", siacoins), zap.Int64("siafunds", siafunds), zap.Uint64("pruneHeight", pruneHeight))
+			log.Debug("pruned elements", zap.Int64("bigfiles", bigfiles), zap.Int64("bigfunds", bigfunds), zap.Uint64("pruneHeight", pruneHeight))
 		}
 		return nil
 	})
@@ -262,19 +262,19 @@ func (s *Store) SetIndexMode(mode wallet.IndexMode) error {
 // ResetChainState deletes all blockchain state from the database.
 func (s *Store) ResetChainState() error {
 	return s.transaction(func(tx *txn) error {
-		_, err := tx.Exec(`UPDATE sia_addresses SET siacoin_balance=$1, siafund_balance=0, immature_siacoin_balance=$1`, encode(types.ZeroCurrency))
+		_, err := tx.Exec(`UPDATE bigfile_addresses SET bigfile_balance=$1, bigfund_balance=0, immature_bigfile_balance=$1`, encode(types.ZeroCurrency))
 		if err != nil {
-			return fmt.Errorf("failed to reset sia addresses: %w", err)
+			return fmt.Errorf("failed to reset bigfile addresses: %w", err)
 		}
 
-		_, err = tx.Exec(`DELETE FROM siacoin_elements`)
+		_, err = tx.Exec(`DELETE FROM bigfile_elements`)
 		if err != nil {
-			return fmt.Errorf("failed to delete siacoin elements: %w", err)
+			return fmt.Errorf("failed to delete bigfile elements: %w", err)
 		}
 
-		_, err = tx.Exec(`DELETE FROM siafund_elements`)
+		_, err = tx.Exec(`DELETE FROM bigfund_elements`)
 		if err != nil {
-			return fmt.Errorf("failed to delete siafund elements: %w", err)
+			return fmt.Errorf("failed to delete bigfund elements: %w", err)
 		}
 
 		_, err = tx.Exec(`DELETE FROM state_tree`)
@@ -305,11 +305,11 @@ func (s *Store) ResetChainState() error {
 	})
 }
 
-func getSiacoinStateElements(tx *txn) ([]stateElement, error) {
-	const query = `SELECT id, leaf_index, merkle_proof FROM siacoin_elements`
+func getBigfileStateElements(tx *txn) ([]stateElement, error) {
+	const query = `SELECT id, leaf_index, merkle_proof FROM bigfile_elements`
 	rows, err := tx.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query siacoin elements: %w", err)
+		return nil, fmt.Errorf("failed to query bigfile elements: %w", err)
 	}
 	defer rows.Close()
 
@@ -317,18 +317,18 @@ func getSiacoinStateElements(tx *txn) ([]stateElement, error) {
 	for rows.Next() {
 		var se stateElement
 		if err := rows.Scan(decode(&se.ID), &se.LeafIndex, decode(&se.MerkleProof)); err != nil {
-			return nil, fmt.Errorf("failed to scan siacoin element: %w", err)
+			return nil, fmt.Errorf("failed to scan bigfile element: %w", err)
 		}
 		elements = append(elements, se)
 	}
 	return elements, rows.Err()
 }
 
-func getSiafundStateElements(tx *txn) ([]stateElement, error) {
-	const query = `SELECT id, leaf_index, merkle_proof FROM siafund_elements`
+func getBigfundStateElements(tx *txn) ([]stateElement, error) {
+	const query = `SELECT id, leaf_index, merkle_proof FROM bigfund_elements`
 	rows, err := tx.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query siafund elements: %w", err)
+		return nil, fmt.Errorf("failed to query bigfund elements: %w", err)
 	}
 	defer rows.Close()
 
@@ -336,18 +336,18 @@ func getSiafundStateElements(tx *txn) ([]stateElement, error) {
 	for rows.Next() {
 		var se stateElement
 		if err := rows.Scan(decode(&se.ID), &se.LeafIndex, decode(&se.MerkleProof)); err != nil {
-			return nil, fmt.Errorf("failed to scan siacoin element: %w", err)
+			return nil, fmt.Errorf("failed to scan bigfile element: %w", err)
 		}
 		elements = append(elements, se)
 	}
 	return elements, rows.Err()
 }
 
-func updateSiafundStateElements(tx *txn, elements []stateElement) error {
+func updateBigfundStateElements(tx *txn, elements []stateElement) error {
 	if len(elements) == 0 {
 		return nil
 	}
-	const query = `UPDATE siafund_elements SET merkle_proof=$1, leaf_index=$2 WHERE id=$3`
+	const query = `UPDATE bigfund_elements SET merkle_proof=$1, leaf_index=$2 WHERE id=$3`
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -367,11 +367,11 @@ func updateSiafundStateElements(tx *txn, elements []stateElement) error {
 	return nil
 }
 
-func updateSiacoinStateElements(tx *txn, elements []stateElement) error {
+func updateBigfileStateElements(tx *txn, elements []stateElement) error {
 	if len(elements) == 0 {
 		return nil
 	}
-	const query = `UPDATE siacoin_elements SET merkle_proof=$1, leaf_index=$2 WHERE id=$3`
+	const query = `UPDATE bigfile_elements SET merkle_proof=$1, leaf_index=$2 WHERE id=$3`
 	stmt, err := tx.Prepare(query)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -392,53 +392,53 @@ func updateSiacoinStateElements(tx *txn, elements []stateElement) error {
 }
 
 func scanAddress(s scanner) (ab addressRef, err error) {
-	err = s.Scan(&ab.ID, decode(&ab.Balance.Siacoins), decode(&ab.Balance.ImmatureSiacoins), &ab.Balance.Siafunds)
+	err = s.Scan(&ab.ID, decode(&ab.Balance.Bigfiles), decode(&ab.Balance.ImmatureBigfiles), &ab.Balance.Bigfunds)
 	return
 }
 
-func applyMatureSiacoinBalance(tx *txn, index types.ChainIndex, log *zap.Logger) error {
+func applyMatureBigfileBalance(tx *txn, index types.ChainIndex, log *zap.Logger) error {
 	log = log.With(zap.Uint64("maturityHeight", index.Height))
-	const query = `SELECT id, address_id, siacoin_value
-FROM siacoin_elements
+	const query = `SELECT id, address_id, bigfile_value
+FROM bigfile_elements
 WHERE maturity_height=$1 AND matured=false AND spent_index_id IS NULL`
 	rows, err := tx.Query(query, index.Height)
 	if err != nil {
-		return fmt.Errorf("failed to query siacoin elements: %w", err)
+		return fmt.Errorf("failed to query bigfile elements: %w", err)
 	}
 	defer rows.Close()
 
-	var matured []types.SiacoinOutputID
+	var matured []types.BigfileOutputID
 	balanceDelta := make(map[int64]types.Currency)
 	for rows.Next() {
-		var outputID types.SiacoinOutputID
+		var outputID types.BigfileOutputID
 		var addressID int64
 		var value types.Currency
 
 		if err := rows.Scan(decode(&outputID), &addressID, decode(&value)); err != nil {
-			return fmt.Errorf("failed to scan siacoin balance: %w", err)
+			return fmt.Errorf("failed to scan bigfile balance: %w", err)
 		}
 		balanceDelta[addressID] = balanceDelta[addressID].Add(value)
 		matured = append(matured, outputID)
-		log.Debug("matured siacoin output", zap.Stringer("outputID", outputID), zap.Int64("addressID", addressID), zap.Stringer("value", value))
+		log.Debug("matured bigfile output", zap.Stringer("outputID", outputID), zap.Int64("addressID", addressID), zap.Stringer("value", value))
 	}
 
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("failed to scan siacoin elements: %w", err)
+		return fmt.Errorf("failed to scan bigfile elements: %w", err)
 	}
 
-	updateMaturedStmt, err := tx.Prepare(`UPDATE siacoin_elements SET matured=true WHERE id=$1`)
+	updateMaturedStmt, err := tx.Prepare(`UPDATE bigfile_elements SET matured=true WHERE id=$1`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
 	defer updateMaturedStmt.Close()
 
-	getAddressBalanceStmt, err := tx.Prepare(`SELECT siacoin_balance, immature_siacoin_balance FROM sia_addresses WHERE id=$1`)
+	getAddressBalanceStmt, err := tx.Prepare(`SELECT bigfile_balance, immature_bigfile_balance FROM bigfile_addresses WHERE id=$1`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
 	defer getAddressBalanceStmt.Close()
 
-	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE sia_addresses SET siacoin_balance=$1, immature_siacoin_balance=$2 WHERE id=$3`)
+	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE bigfile_addresses SET bigfile_balance=$1, immature_bigfile_balance=$2 WHERE id=$3`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
@@ -476,47 +476,47 @@ WHERE maturity_height=$1 AND matured=false AND spent_index_id IS NULL`
 	return nil
 }
 
-func revertMatureSiacoinBalance(tx *txn, index types.ChainIndex) error {
-	const query = `SELECT se.id, se.address_id, se.siacoin_value
-	FROM siacoin_elements se
+func revertMatureBigfileBalance(tx *txn, index types.ChainIndex) error {
+	const query = `SELECT se.id, se.address_id, se.bigfile_value
+	FROM bigfile_elements se
 	WHERE maturity_height=$1 AND matured=true AND spent_index_id IS NULL`
 	rows, err := tx.Query(query, index.Height)
 	if err != nil {
-		return fmt.Errorf("failed to query siacoin elements: %w", err)
+		return fmt.Errorf("failed to query bigfile elements: %w", err)
 	}
 	defer rows.Close()
 
-	var matured []types.SiacoinOutputID
+	var matured []types.BigfileOutputID
 	balanceDelta := make(map[int64]types.Currency)
 	for rows.Next() {
-		var outputID types.SiacoinOutputID
+		var outputID types.BigfileOutputID
 		var addressID int64
 		var value types.Currency
 
 		if err := rows.Scan(decode(&outputID), &addressID, decode(&value)); err != nil {
-			return fmt.Errorf("failed to scan siacoin balance: %w", err)
+			return fmt.Errorf("failed to scan bigfile balance: %w", err)
 		}
 		balanceDelta[addressID] = balanceDelta[addressID].Add(value)
 		matured = append(matured, outputID)
 	}
 
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("failed to scan siacoin elements: %w", err)
+		return fmt.Errorf("failed to scan bigfile elements: %w", err)
 	}
 
-	updateMaturedStmt, err := tx.Prepare(`UPDATE siacoin_elements SET matured=false WHERE id=$1`)
+	updateMaturedStmt, err := tx.Prepare(`UPDATE bigfile_elements SET matured=false WHERE id=$1`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
 	defer updateMaturedStmt.Close()
 
-	getAddressBalanceStmt, err := tx.Prepare(`SELECT siacoin_balance, immature_siacoin_balance FROM sia_addresses WHERE id=$1`)
+	getAddressBalanceStmt, err := tx.Prepare(`SELECT bigfile_balance, immature_bigfile_balance FROM bigfile_addresses WHERE id=$1`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
 	defer getAddressBalanceStmt.Close()
 
-	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE sia_addresses SET siacoin_balance=$1, immature_siacoin_balance=$2 WHERE id=$3`)
+	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE bigfile_addresses SET bigfile_balance=$1, immature_bigfile_balance=$2 WHERE id=$3`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
@@ -555,7 +555,7 @@ func revertMatureSiacoinBalance(tx *txn, index types.ChainIndex) error {
 	return nil
 }
 
-func addSiacoinElements(tx *txn, elements []types.SiacoinElement, indexID int64, indexMode wallet.IndexMode, log *zap.Logger) error {
+func addBigfileElements(tx *txn, elements []types.BigfileElement, indexID int64, indexMode wallet.IndexMode, log *zap.Logger) error {
 	if len(elements) == 0 {
 		return nil
 	}
@@ -566,14 +566,14 @@ func addSiacoinElements(tx *txn, elements []types.SiacoinElement, indexID int64,
 	}
 	defer done()
 
-	existsStmt, err := tx.Prepare(`SELECT EXISTS(SELECT 1 FROM siacoin_elements WHERE id=$1)`)
+	existsStmt, err := tx.Prepare(`SELECT EXISTS(SELECT 1 FROM bigfile_elements WHERE id=$1)`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare exists statement: %w", err)
 	}
 	defer existsStmt.Close()
 
 	// ignore elements already in the database.
-	insertStmt, err := tx.Prepare(`INSERT INTO siacoin_elements (id, siacoin_value, merkle_proof, leaf_index, maturity_height, address_id, matured, chain_index_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO UPDATE SET leaf_index=EXCLUDED.leaf_index, merkle_proof=EXCLUDED.merkle_proof`)
+	insertStmt, err := tx.Prepare(`INSERT INTO bigfile_elements (id, bigfile_value, merkle_proof, leaf_index, maturity_height, address_id, matured, chain_index_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO UPDATE SET leaf_index=EXCLUDED.leaf_index, merkle_proof=EXCLUDED.merkle_proof`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare insert statement: %w", err)
 	}
@@ -581,7 +581,7 @@ func addSiacoinElements(tx *txn, elements []types.SiacoinElement, indexID int64,
 
 	balanceChanges := make(map[int64]wallet.Balance)
 	for _, se := range elements {
-		addrRef, err := addressRefStmt(se.SiacoinOutput.Address)
+		addrRef, err := addressRefStmt(se.BigfileOutput.Address)
 		if err != nil {
 			return fmt.Errorf("failed to query address: %w", err)
 		} else if _, ok := balanceChanges[addrRef.ID]; !ok {
@@ -591,7 +591,7 @@ func addSiacoinElements(tx *txn, elements []types.SiacoinElement, indexID int64,
 		var exists bool
 		err = existsStmt.QueryRow(encode(se.ID)).Scan(&exists)
 		if err != nil {
-			return fmt.Errorf("failed to check if siacoin element exists: %w", err)
+			return fmt.Errorf("failed to check if bigfile element exists: %w", err)
 		}
 
 		// in full index mode, Merkle proofs are stored in the state tree table
@@ -600,23 +600,23 @@ func addSiacoinElements(tx *txn, elements []types.SiacoinElement, indexID int64,
 			se.StateElement.MerkleProof = nil
 		}
 
-		_, err = insertStmt.Exec(encode(se.ID), encode(se.SiacoinOutput.Value), encode(se.StateElement.MerkleProof), se.StateElement.LeafIndex, se.MaturityHeight, addrRef.ID, se.MaturityHeight == 0, indexID)
+		_, err = insertStmt.Exec(encode(se.ID), encode(se.BigfileOutput.Value), encode(se.StateElement.MerkleProof), se.StateElement.LeafIndex, se.MaturityHeight, addrRef.ID, se.MaturityHeight == 0, indexID)
 		if err != nil {
 			return fmt.Errorf("failed to execute statement: %w", err)
 		}
 		// skip balance update if the element already exists
 		if exists {
-			log.Debug("updated siacoin element", zap.Stringer("id", se.ID), zap.Stringer("address", se.SiacoinOutput.Address), zap.Stringer("value", se.SiacoinOutput.Value))
+			log.Debug("updated bigfile element", zap.Stringer("id", se.ID), zap.Stringer("address", se.BigfileOutput.Address), zap.Stringer("value", se.BigfileOutput.Value))
 			continue
 		}
 
 		balance := balanceChanges[addrRef.ID]
 		if se.MaturityHeight == 0 {
-			balance.Siacoins = balance.Siacoins.Add(se.SiacoinOutput.Value)
-			log.Debug("added siacoin output", zap.Stringer("id", se.ID), zap.Stringer("address", se.SiacoinOutput.Address), zap.Stringer("value", se.SiacoinOutput.Value))
+			balance.Bigfiles = balance.Bigfiles.Add(se.BigfileOutput.Value)
+			log.Debug("added bigfile output", zap.Stringer("id", se.ID), zap.Stringer("address", se.BigfileOutput.Address), zap.Stringer("value", se.BigfileOutput.Value))
 		} else {
-			balance.ImmatureSiacoins = balance.ImmatureSiacoins.Add(se.SiacoinOutput.Value)
-			log.Debug("added immature siacoin output", zap.Stringer("id", se.ID), zap.Stringer("address", se.SiacoinOutput.Address), zap.Stringer("value", se.SiacoinOutput.Value), zap.Uint64("maturityHeight", se.MaturityHeight))
+			balance.ImmatureBigfiles = balance.ImmatureBigfiles.Add(se.BigfileOutput.Value)
+			log.Debug("added immature bigfile output", zap.Stringer("id", se.ID), zap.Stringer("address", se.BigfileOutput.Address), zap.Stringer("value", se.BigfileOutput.Value), zap.Uint64("maturityHeight", se.MaturityHeight))
 		}
 		balanceChanges[addrRef.ID] = balance
 	}
@@ -625,14 +625,14 @@ func addSiacoinElements(tx *txn, elements []types.SiacoinElement, indexID int64,
 		return nil
 	}
 
-	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE sia_addresses SET siacoin_balance=$1, immature_siacoin_balance=$2 WHERE id=$3`)
+	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE bigfile_addresses SET bigfile_balance=$1, immature_bigfile_balance=$2 WHERE id=$3`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare update balance statement: %w", err)
 	}
 	defer updateAddressBalanceStmt.Close()
 
 	for addrID, balance := range balanceChanges {
-		res, err := updateAddressBalanceStmt.Exec(encode(balance.Siacoins), encode(balance.ImmatureSiacoins), addrID)
+		res, err := updateAddressBalanceStmt.Exec(encode(balance.Bigfiles), encode(balance.ImmatureBigfiles), addrID)
 		if err != nil {
 			return fmt.Errorf("failed to update balance: %w", err)
 		} else if n, err := res.RowsAffected(); err != nil {
@@ -644,7 +644,7 @@ func addSiacoinElements(tx *txn, elements []types.SiacoinElement, indexID int64,
 	return nil
 }
 
-func removeSiacoinElements(tx *txn, elements []types.SiacoinElement) error {
+func removeBigfileElements(tx *txn, elements []types.BigfileElement) error {
 	if len(elements) == 0 {
 		return nil
 	}
@@ -655,7 +655,7 @@ func removeSiacoinElements(tx *txn, elements []types.SiacoinElement) error {
 	}
 	defer done()
 
-	stmt, err := tx.Prepare(`DELETE FROM siacoin_elements WHERE id=$1 RETURNING id, matured`)
+	stmt, err := tx.Prepare(`DELETE FROM bigfile_elements WHERE id=$1 RETURNING id, matured`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
@@ -663,7 +663,7 @@ func removeSiacoinElements(tx *txn, elements []types.SiacoinElement) error {
 
 	balanceChanges := make(map[int64]wallet.Balance)
 	for _, se := range elements {
-		addrRef, err := addressRefStmt(se.SiacoinOutput.Address)
+		addrRef, err := addressRefStmt(se.BigfileOutput.Address)
 		if err != nil {
 			return fmt.Errorf("failed to query address: %w", err)
 		} else if _, ok := balanceChanges[addrRef.ID]; !ok {
@@ -679,9 +679,9 @@ func removeSiacoinElements(tx *txn, elements []types.SiacoinElement) error {
 
 		balance := balanceChanges[addrRef.ID]
 		if matured {
-			balance.Siacoins = balance.Siacoins.Sub(se.SiacoinOutput.Value)
+			balance.Bigfiles = balance.Bigfiles.Sub(se.BigfileOutput.Value)
 		} else {
-			balance.ImmatureSiacoins = balance.ImmatureSiacoins.Sub(se.SiacoinOutput.Value)
+			balance.ImmatureBigfiles = balance.ImmatureBigfiles.Sub(se.BigfileOutput.Value)
 		}
 		balanceChanges[addrRef.ID] = balance
 	}
@@ -690,14 +690,14 @@ func removeSiacoinElements(tx *txn, elements []types.SiacoinElement) error {
 		return nil
 	}
 
-	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE sia_addresses SET siacoin_balance=$1, immature_siacoin_balance=$2 WHERE id=$3`)
+	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE bigfile_addresses SET bigfile_balance=$1, immature_bigfile_balance=$2 WHERE id=$3`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare update balance statement: %w", err)
 	}
 	defer updateAddressBalanceStmt.Close()
 
 	for addrID, balance := range balanceChanges {
-		res, err := updateAddressBalanceStmt.Exec(encode(balance.Siacoins), encode(balance.ImmatureSiacoins), addrID)
+		res, err := updateAddressBalanceStmt.Exec(encode(balance.Bigfiles), encode(balance.ImmatureBigfiles), addrID)
 		if err != nil {
 			return fmt.Errorf("failed to update balance: %w", err)
 		} else if n, err := res.RowsAffected(); err != nil {
@@ -709,7 +709,7 @@ func removeSiacoinElements(tx *txn, elements []types.SiacoinElement) error {
 	return nil
 }
 
-func revertSpentSiacoinElements(tx *txn, elements []types.SiacoinElement) error {
+func revertSpentBigfileElements(tx *txn, elements []types.BigfileElement) error {
 	if len(elements) == 0 {
 		return nil
 	}
@@ -720,7 +720,7 @@ func revertSpentSiacoinElements(tx *txn, elements []types.SiacoinElement) error 
 	}
 	defer done()
 
-	stmt, err := tx.Prepare(`UPDATE siacoin_elements SET spent_index_id=NULL, spent_event_id=NULL WHERE id=$1 AND spent_index_id IS NOT NULL RETURNING id`)
+	stmt, err := tx.Prepare(`UPDATE bigfile_elements SET spent_index_id=NULL, spent_event_id=NULL WHERE id=$1 AND spent_index_id IS NOT NULL RETURNING id`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
@@ -728,7 +728,7 @@ func revertSpentSiacoinElements(tx *txn, elements []types.SiacoinElement) error 
 
 	balanceChanges := make(map[int64]wallet.Balance)
 	for _, se := range elements {
-		addrRef, err := addressRefStmt(se.SiacoinOutput.Address)
+		addrRef, err := addressRefStmt(se.BigfileOutput.Address)
 		if err != nil {
 			return fmt.Errorf("failed to query address: %w", err)
 		} else if _, ok := balanceChanges[addrRef.ID]; !ok {
@@ -743,7 +743,7 @@ func revertSpentSiacoinElements(tx *txn, elements []types.SiacoinElement) error 
 		}
 
 		balance := balanceChanges[addrRef.ID]
-		balance.Siacoins = balance.Siacoins.Add(se.SiacoinOutput.Value)
+		balance.Bigfiles = balance.Bigfiles.Add(se.BigfileOutput.Value)
 		balanceChanges[addrRef.ID] = balance
 	}
 
@@ -751,14 +751,14 @@ func revertSpentSiacoinElements(tx *txn, elements []types.SiacoinElement) error 
 		return nil
 	}
 
-	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE sia_addresses SET siacoin_balance=$1 WHERE id=$2`)
+	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE bigfile_addresses SET bigfile_balance=$1 WHERE id=$2`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare update balance statement: %w", err)
 	}
 	defer updateAddressBalanceStmt.Close()
 
 	for addrID, balance := range balanceChanges {
-		res, err := updateAddressBalanceStmt.Exec(encode(balance.Siacoins), addrID)
+		res, err := updateAddressBalanceStmt.Exec(encode(balance.Bigfiles), addrID)
 		if err != nil {
 			return fmt.Errorf("failed to update balance: %w", err)
 		} else if n, err := res.RowsAffected(); err != nil {
@@ -770,7 +770,7 @@ func revertSpentSiacoinElements(tx *txn, elements []types.SiacoinElement) error 
 	return nil
 }
 
-func spendSiacoinElements(tx *txn, elements []wallet.SpentSiacoinElement, indexID int64) error {
+func spendBigfileElements(tx *txn, elements []wallet.SpentBigfileElement, indexID int64) error {
 	if len(elements) == 0 {
 		return nil
 	}
@@ -787,7 +787,7 @@ func spendSiacoinElements(tx *txn, elements []wallet.SpentSiacoinElement, indexI
 	}
 	defer getEventIDStmt.Close()
 
-	stmt, err := tx.Prepare(`UPDATE siacoin_elements SET spent_index_id=$1, spent_event_id=$2 WHERE id=$3 AND spent_index_id IS NULL RETURNING id`)
+	stmt, err := tx.Prepare(`UPDATE bigfile_elements SET spent_index_id=$1, spent_event_id=$2 WHERE id=$3 AND spent_index_id IS NULL RETURNING id`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
@@ -795,7 +795,7 @@ func spendSiacoinElements(tx *txn, elements []wallet.SpentSiacoinElement, indexI
 
 	balanceChanges := make(map[int64]wallet.Balance)
 	for _, se := range elements {
-		addrRef, err := addressRefStmt(se.SiacoinOutput.Address)
+		addrRef, err := addressRefStmt(se.BigfileOutput.Address)
 		if err != nil {
 			return fmt.Errorf("failed to query address: %w", err)
 		} else if _, ok := balanceChanges[addrRef.ID]; !ok {
@@ -815,7 +815,7 @@ func spendSiacoinElements(tx *txn, elements []wallet.SpentSiacoinElement, indexI
 		}
 
 		balance := balanceChanges[addrRef.ID]
-		balance.Siacoins = balance.Siacoins.Sub(se.SiacoinOutput.Value)
+		balance.Bigfiles = balance.Bigfiles.Sub(se.BigfileOutput.Value)
 		balanceChanges[addrRef.ID] = balance
 	}
 
@@ -823,14 +823,14 @@ func spendSiacoinElements(tx *txn, elements []wallet.SpentSiacoinElement, indexI
 		return nil
 	}
 
-	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE sia_addresses SET siacoin_balance=$1 WHERE id=$2`)
+	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE bigfile_addresses SET bigfile_balance=$1 WHERE id=$2`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare update balance statement: %w", err)
 	}
 	defer updateAddressBalanceStmt.Close()
 
 	for addrID, balance := range balanceChanges {
-		res, err := updateAddressBalanceStmt.Exec(encode(balance.Siacoins), addrID)
+		res, err := updateAddressBalanceStmt.Exec(encode(balance.Bigfiles), addrID)
 		if err != nil {
 			return fmt.Errorf("failed to update balance: %w", err)
 		} else if n, err := res.RowsAffected(); err != nil {
@@ -842,7 +842,7 @@ func spendSiacoinElements(tx *txn, elements []wallet.SpentSiacoinElement, indexI
 	return nil
 }
 
-func addSiafundElements(tx *txn, elements []types.SiafundElement, indexID int64, indexMode wallet.IndexMode, log *zap.Logger) error {
+func addBigfundElements(tx *txn, elements []types.BigfundElement, indexID int64, indexMode wallet.IndexMode, log *zap.Logger) error {
 	if len(elements) == 0 {
 		return nil
 	}
@@ -853,13 +853,13 @@ func addSiafundElements(tx *txn, elements []types.SiafundElement, indexID int64,
 	}
 	defer done()
 
-	existsStmt, err := tx.Prepare(`SELECT EXISTS(SELECT 1 FROM siafund_elements WHERE id=$1)`)
+	existsStmt, err := tx.Prepare(`SELECT EXISTS(SELECT 1 FROM bigfund_elements WHERE id=$1)`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare exists statement: %w", err)
 	}
 	defer existsStmt.Close()
 
-	insertStmt, err := tx.Prepare(`INSERT INTO siafund_elements (id, siafund_value, merkle_proof, leaf_index, claim_start, address_id, chain_index_id) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO UPDATE SET leaf_index=EXCLUDED.leaf_index, merkle_proof=EXCLUDED.merkle_proof`)
+	insertStmt, err := tx.Prepare(`INSERT INTO bigfund_elements (id, bigfund_value, merkle_proof, leaf_index, claim_start, address_id, chain_index_id) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO UPDATE SET leaf_index=EXCLUDED.leaf_index, merkle_proof=EXCLUDED.merkle_proof`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
@@ -867,16 +867,16 @@ func addSiafundElements(tx *txn, elements []types.SiafundElement, indexID int64,
 
 	balanceChanges := make(map[int64]uint64)
 	for _, se := range elements {
-		addrRef, err := addressRefStmt(se.SiafundOutput.Address)
+		addrRef, err := addressRefStmt(se.BigfundOutput.Address)
 		if err != nil {
 			return fmt.Errorf("failed to query address: %w", err)
 		} else if _, ok := balanceChanges[addrRef.ID]; !ok {
-			balanceChanges[addrRef.ID] = addrRef.Balance.Siafunds
+			balanceChanges[addrRef.ID] = addrRef.Balance.Bigfunds
 		}
 
 		var exists bool
 		if err := existsStmt.QueryRow(encode(se.ID)).Scan(&exists); err != nil {
-			return fmt.Errorf("failed to check if siafund element exists: %w", err)
+			return fmt.Errorf("failed to check if bigfund element exists: %w", err)
 		}
 
 		// in full index mode, Merkle proofs are stored in the state tree table
@@ -885,22 +885,22 @@ func addSiafundElements(tx *txn, elements []types.SiafundElement, indexID int64,
 			se.StateElement.MerkleProof = nil
 		}
 
-		_, err = insertStmt.Exec(encode(se.ID), se.SiafundOutput.Value, encode(se.StateElement.MerkleProof), se.StateElement.LeafIndex, encode(se.ClaimStart), addrRef.ID, indexID)
+		_, err = insertStmt.Exec(encode(se.ID), se.BigfundOutput.Value, encode(se.StateElement.MerkleProof), se.StateElement.LeafIndex, encode(se.ClaimStart), addrRef.ID, indexID)
 		if err != nil {
 			return fmt.Errorf("failed to execute statement: %w", err)
 		} else if exists {
 			// skip balance update if the element already exists
-			log.Debug("updated siafund element", zap.Stringer("id", se.ID), zap.Stringer("address", se.SiafundOutput.Address), zap.Uint64("value", se.SiafundOutput.Value))
+			log.Debug("updated bigfund element", zap.Stringer("id", se.ID), zap.Stringer("address", se.BigfundOutput.Address), zap.Uint64("value", se.BigfundOutput.Value))
 			continue
 		}
-		balanceChanges[addrRef.ID] += se.SiafundOutput.Value
+		balanceChanges[addrRef.ID] += se.BigfundOutput.Value
 	}
 
 	if len(balanceChanges) == 0 {
 		return nil
 	}
 
-	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE sia_addresses SET siafund_balance=$1 WHERE id=$2`)
+	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE bigfile_addresses SET bigfund_balance=$1 WHERE id=$2`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare update balance statement: %w", err)
 	}
@@ -919,7 +919,7 @@ func addSiafundElements(tx *txn, elements []types.SiafundElement, indexID int64,
 	return nil
 }
 
-func removeSiafundElements(tx *txn, elements []types.SiafundElement) error {
+func removeBigfundElements(tx *txn, elements []types.BigfundElement) error {
 	if len(elements) == 0 {
 		return nil
 	}
@@ -930,7 +930,7 @@ func removeSiafundElements(tx *txn, elements []types.SiafundElement) error {
 	}
 	defer done()
 
-	stmt, err := tx.Prepare(`DELETE FROM siafund_elements WHERE id=$1 RETURNING id`)
+	stmt, err := tx.Prepare(`DELETE FROM bigfund_elements WHERE id=$1 RETURNING id`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
@@ -938,11 +938,11 @@ func removeSiafundElements(tx *txn, elements []types.SiafundElement) error {
 
 	balanceChanges := make(map[int64]uint64)
 	for _, se := range elements {
-		addrRef, err := addressRefStmt(se.SiafundOutput.Address)
+		addrRef, err := addressRefStmt(se.BigfundOutput.Address)
 		if err != nil {
 			return fmt.Errorf("failed to query address: %w", err)
 		} else if _, ok := balanceChanges[addrRef.ID]; !ok {
-			balanceChanges[addrRef.ID] = addrRef.Balance.Siafunds
+			balanceChanges[addrRef.ID] = addrRef.Balance.Bigfunds
 		}
 
 		var dummy types.Hash256
@@ -951,17 +951,17 @@ func removeSiafundElements(tx *txn, elements []types.SiafundElement) error {
 			return fmt.Errorf("failed to delete element %q: %w", se.ID, err)
 		}
 
-		if balanceChanges[addrRef.ID] < se.SiafundOutput.Value {
-			panic("siafund balance cannot be negative")
+		if balanceChanges[addrRef.ID] < se.BigfundOutput.Value {
+			panic("bigfund balance cannot be negative")
 		}
-		balanceChanges[addrRef.ID] -= se.SiafundOutput.Value
+		balanceChanges[addrRef.ID] -= se.BigfundOutput.Value
 	}
 
 	if len(balanceChanges) == 0 {
 		return nil
 	}
 
-	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE sia_addresses SET siafund_balance=$1 WHERE id=$2`)
+	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE bigfile_addresses SET bigfund_balance=$1 WHERE id=$2`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare update balance statement: %w", err)
 	}
@@ -980,7 +980,7 @@ func removeSiafundElements(tx *txn, elements []types.SiafundElement) error {
 	return nil
 }
 
-func spendSiafundElements(tx *txn, elements []wallet.SpentSiafundElement, indexID int64) error {
+func spendBigfundElements(tx *txn, elements []wallet.SpentBigfundElement, indexID int64) error {
 	if len(elements) == 0 {
 		return nil
 	}
@@ -997,7 +997,7 @@ func spendSiafundElements(tx *txn, elements []wallet.SpentSiafundElement, indexI
 	}
 	defer getEventIDStmt.Close()
 
-	stmt, err := tx.Prepare(`UPDATE siafund_elements SET spent_index_id=$1, spent_event_id=$2 WHERE id=$3 AND spent_index_id IS NULL RETURNING id`)
+	stmt, err := tx.Prepare(`UPDATE bigfund_elements SET spent_index_id=$1, spent_event_id=$2 WHERE id=$3 AND spent_index_id IS NULL RETURNING id`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
@@ -1005,7 +1005,7 @@ func spendSiafundElements(tx *txn, elements []wallet.SpentSiafundElement, indexI
 
 	balanceChanges := make(map[int64]wallet.Balance)
 	for _, se := range elements {
-		addrRef, err := addressRefStmt(se.SiafundOutput.Address)
+		addrRef, err := addressRefStmt(se.BigfundOutput.Address)
 		if err != nil {
 			return fmt.Errorf("failed to query address: %w", err)
 		} else if _, ok := balanceChanges[addrRef.ID]; !ok {
@@ -1025,10 +1025,10 @@ func spendSiafundElements(tx *txn, elements []wallet.SpentSiafundElement, indexI
 		}
 
 		balance := balanceChanges[addrRef.ID]
-		if balance.Siafunds < se.SiafundOutput.Value {
-			panic("siafund balance cannot be negative")
+		if balance.Bigfunds < se.BigfundOutput.Value {
+			panic("bigfund balance cannot be negative")
 		}
-		balance.Siafunds -= se.SiafundOutput.Value
+		balance.Bigfunds -= se.BigfundOutput.Value
 
 		balanceChanges[addrRef.ID] = balance
 	}
@@ -1037,14 +1037,14 @@ func spendSiafundElements(tx *txn, elements []wallet.SpentSiafundElement, indexI
 		return nil
 	}
 
-	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE sia_addresses SET siafund_balance=$1 WHERE id=$3`)
+	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE bigfile_addresses SET bigfund_balance=$1 WHERE id=$3`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare update balance statement: %w", err)
 	}
 	defer updateAddressBalanceStmt.Close()
 
 	for addrID, balance := range balanceChanges {
-		res, err := updateAddressBalanceStmt.Exec(balance.Siafunds, addrID)
+		res, err := updateAddressBalanceStmt.Exec(balance.Bigfunds, addrID)
 		if err != nil {
 			return fmt.Errorf("failed to update balance: %w", err)
 		} else if n, err := res.RowsAffected(); err != nil {
@@ -1056,7 +1056,7 @@ func spendSiafundElements(tx *txn, elements []wallet.SpentSiafundElement, indexI
 	return nil
 }
 
-func revertSpentSiafundElements(tx *txn, elements []types.SiafundElement) error {
+func revertSpentBigfundElements(tx *txn, elements []types.BigfundElement) error {
 	if len(elements) == 0 {
 		return nil
 	}
@@ -1067,7 +1067,7 @@ func revertSpentSiafundElements(tx *txn, elements []types.SiafundElement) error 
 	}
 	defer done()
 
-	stmt, err := tx.Prepare(`UPDATE siafund_elements SET spent_index_id=NULL, spent_event_id=NULL WHERE id=$1 AND spent_index_id IS NOT NULL RETURNING id`)
+	stmt, err := tx.Prepare(`UPDATE bigfund_elements SET spent_index_id=NULL, spent_event_id=NULL WHERE id=$1 AND spent_index_id IS NOT NULL RETURNING id`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
@@ -1075,7 +1075,7 @@ func revertSpentSiafundElements(tx *txn, elements []types.SiafundElement) error 
 
 	balanceChanges := make(map[int64]wallet.Balance)
 	for _, se := range elements {
-		addrRef, err := addressRefStmt(se.SiafundOutput.Address)
+		addrRef, err := addressRefStmt(se.BigfundOutput.Address)
 		if err != nil {
 			return fmt.Errorf("failed to query address: %w", err)
 		} else if _, ok := balanceChanges[addrRef.ID]; !ok {
@@ -1090,7 +1090,7 @@ func revertSpentSiafundElements(tx *txn, elements []types.SiafundElement) error 
 		}
 
 		balance := balanceChanges[addrRef.ID]
-		balance.Siafunds += se.SiafundOutput.Value
+		balance.Bigfunds += se.BigfundOutput.Value
 		balanceChanges[addrRef.ID] = balance
 	}
 
@@ -1098,14 +1098,14 @@ func revertSpentSiafundElements(tx *txn, elements []types.SiafundElement) error 
 		return nil
 	}
 
-	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE sia_addresses SET siafund_balance=$1 WHERE id=$3`)
+	updateAddressBalanceStmt, err := tx.Prepare(`UPDATE bigfile_addresses SET bigfund_balance=$1 WHERE id=$3`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare update balance statement: %w", err)
 	}
 	defer updateAddressBalanceStmt.Close()
 
 	for addrID, balance := range balanceChanges {
-		res, err := updateAddressBalanceStmt.Exec(balance.Siafunds, addrID)
+		res, err := updateAddressBalanceStmt.Exec(balance.Bigfunds, addrID)
 		if err != nil {
 			return fmt.Errorf("failed to update balance: %w", err)
 		} else if n, err := res.RowsAffected(); err != nil {
@@ -1128,7 +1128,7 @@ func addEvents(tx *txn, events []wallet.Event, indexID int64) error {
 	}
 	defer insertEventStmt.Close()
 
-	addrStmt, err := tx.Prepare(`INSERT INTO sia_addresses (sia_address, siacoin_balance, immature_siacoin_balance, siafund_balance) VALUES ($1, $2, $2, 0) ON CONFLICT (sia_address) DO UPDATE SET sia_address=EXCLUDED.sia_address RETURNING id`)
+	addrStmt, err := tx.Prepare(`INSERT INTO bigfile_addresses (bigfile_address, bigfile_balance, immature_bigfile_balance, bigfund_balance) VALUES ($1, $2, $2, 0) ON CONFLICT (bigfile_address) DO UPDATE SET bigfile_address=EXCLUDED.bigfile_address RETURNING id`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare address statement: %w", err)
 	}
@@ -1189,13 +1189,13 @@ func revertEvents(tx *txn, index types.ChainIndex) error {
 	return err
 }
 
-func revertSpentOrphanedSiacoinElements(tx *txn, index types.ChainIndex, log *zap.Logger) (map[int64]wallet.Balance, error) {
-	rows, err := tx.Query(`UPDATE siacoin_elements SET spent_index_id=NULL, spent_event_id=NULL WHERE id IN (SELECT se.id FROM siacoin_elements se
+func revertSpentOrphanedBigfileElements(tx *txn, index types.ChainIndex, log *zap.Logger) (map[int64]wallet.Balance, error) {
+	rows, err := tx.Query(`UPDATE bigfile_elements SET spent_index_id=NULL, spent_event_id=NULL WHERE id IN (SELECT se.id FROM bigfile_elements se
 INNER JOIN chain_indices ci ON (ci.id=se.spent_index_id)
 WHERE ci.height=$1 AND ci.block_id<>$2)
-RETURNING address_id, siacoin_value`, index.Height, encode(index.ID))
+RETURNING address_id, bigfile_value`, index.Height, encode(index.ID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to query siacoin elements: %w", err)
+		return nil, fmt.Errorf("failed to query bigfile elements: %w", err)
 	}
 	defer rows.Close()
 
@@ -1205,101 +1205,101 @@ RETURNING address_id, siacoin_value`, index.Height, encode(index.ID))
 		var value types.Currency
 
 		if err := rows.Scan(&addrID, decode(&value)); err != nil {
-			return nil, fmt.Errorf("failed to scan siacoin element: %w", err)
+			return nil, fmt.Errorf("failed to scan bigfile element: %w", err)
 		}
 
 		balance := balances[addrID]
-		balance.Siacoins = balance.Siacoins.Add(value)
+		balance.Bigfiles = balance.Bigfiles.Add(value)
 		balances[addrID] = balance
-		log.Debug("reverting spent orphaned siacoin element", zap.Stringer("value", value))
+		log.Debug("reverting spent orphaned bigfile element", zap.Stringer("value", value))
 	}
 	return balances, rows.Err()
 }
 
-func deleteOrphanedSiacoinElements(tx *txn, index types.ChainIndex, log *zap.Logger) (map[int64]wallet.Balance, error) {
-	rows, err := tx.Query(`DELETE FROM siacoin_elements WHERE id IN (SELECT se.id FROM siacoin_elements se
+func deleteOrphanedBigfileElements(tx *txn, index types.ChainIndex, log *zap.Logger) (map[int64]wallet.Balance, error) {
+	rows, err := tx.Query(`DELETE FROM bigfile_elements WHERE id IN (SELECT se.id FROM bigfile_elements se
 INNER JOIN chain_indices ci ON (ci.id=se.chain_index_id)
 WHERE ci.height=$1 AND ci.block_id<>$2)
-RETURNING id, address_id, siacoin_value, matured, spent_index_id IS NOT NULL`, index.Height, encode(index.ID))
+RETURNING id, address_id, bigfile_value, matured, spent_index_id IS NOT NULL`, index.Height, encode(index.ID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to query siacoin elements: %w", err)
+		return nil, fmt.Errorf("failed to query bigfile elements: %w", err)
 	}
 	defer rows.Close()
 
 	balances := make(map[int64]wallet.Balance)
 	for rows.Next() {
-		var outputID types.SiacoinOutputID
+		var outputID types.BigfileOutputID
 		var addrID int64
 		var value types.Currency
 		var matured bool
 		var spent bool
 
 		if err := rows.Scan(decode(&outputID), &addrID, decode(&value), &matured, &spent); err != nil {
-			return nil, fmt.Errorf("failed to scan siacoin element: %w", err)
+			return nil, fmt.Errorf("failed to scan bigfile element: %w", err)
 		}
 
 		balance := balances[addrID]
 		if !matured {
-			balance.ImmatureSiacoins = balance.ImmatureSiacoins.Add(value)
+			balance.ImmatureBigfiles = balance.ImmatureBigfiles.Add(value)
 		} else if !spent {
-			balance.Siacoins = balance.Siacoins.Add(value)
+			balance.Bigfiles = balance.Bigfiles.Add(value)
 		}
 		balances[addrID] = balance
-		log.Debug("deleting orphaned siacoin element", zap.Stringer("id", outputID), zap.Stringer("value", value), zap.Bool("matured", matured), zap.Bool("spent", spent))
+		log.Debug("deleting orphaned bigfile element", zap.Stringer("id", outputID), zap.Stringer("value", value), zap.Bool("matured", matured), zap.Bool("spent", spent))
 	}
 	return balances, rows.Err()
 }
 
-func revertSpentOrphanedSiafundElements(tx *txn, index types.ChainIndex, log *zap.Logger) (map[int64]uint64, error) {
-	rows, err := tx.Query(`UPDATE siafund_elements SET spent_index_id=NULL, spent_event_id=NULL WHERE id IN (SELECT se.id FROM siafund_elements se
+func revertSpentOrphanedBigfundElements(tx *txn, index types.ChainIndex, log *zap.Logger) (map[int64]uint64, error) {
+	rows, err := tx.Query(`UPDATE bigfund_elements SET spent_index_id=NULL, spent_event_id=NULL WHERE id IN (SELECT se.id FROM bigfund_elements se
 INNER JOIN chain_indices ci ON (ci.id=se.spent_index_id)
 WHERE ci.height=$1 AND ci.block_id<>$2)
-RETURNING id, address_id, siafund_value`, index.Height, encode(index.ID))
+RETURNING id, address_id, bigfund_value`, index.Height, encode(index.ID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to query siafund elements: %w", err)
+		return nil, fmt.Errorf("failed to query bigfund elements: %w", err)
 	}
 	defer rows.Close()
 
 	balances := make(map[int64]uint64)
 	for rows.Next() {
-		var outputID types.SiafundOutputID
+		var outputID types.BigfundOutputID
 		var addrID int64
 		var value uint64
 
 		if err := rows.Scan(decode(&outputID), &addrID, value); err != nil {
-			return nil, fmt.Errorf("failed to scan siafund element: %w", err)
+			return nil, fmt.Errorf("failed to scan bigfund element: %w", err)
 		}
 
 		balance := balances[addrID]
 		balance += value
 		balances[addrID] = balance
-		log.Debug("reverting spent orphaned siafund element", zap.Stringer("id", outputID), zap.Uint64("value", value))
+		log.Debug("reverting spent orphaned bigfund element", zap.Stringer("id", outputID), zap.Uint64("value", value))
 	}
 	return balances, rows.Err()
 }
 
-func deleteOrphanedSiafundElements(tx *txn, index types.ChainIndex, log *zap.Logger) (map[int64]uint64, error) {
-	rows, err := tx.Query(`DELETE FROM siafund_elements WHERE id IN (SELECT se.id FROM siafund_elements se
+func deleteOrphanedBigfundElements(tx *txn, index types.ChainIndex, log *zap.Logger) (map[int64]uint64, error) {
+	rows, err := tx.Query(`DELETE FROM bigfund_elements WHERE id IN (SELECT se.id FROM bigfund_elements se
 INNER JOIN chain_indices ci ON (ci.id=se.chain_index_id)
 WHERE ci.height=$1 AND ci.block_id<>$2)
-RETURNING id, address_id, siafund_value, spent_index_id IS NOT NULL`, index.Height, encode(index.ID))
+RETURNING id, address_id, bigfund_value, spent_index_id IS NOT NULL`, index.Height, encode(index.ID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to query siafund elements: %w", err)
+		return nil, fmt.Errorf("failed to query bigfund elements: %w", err)
 	}
 	defer rows.Close()
 
 	balances := make(map[int64]uint64)
 	for rows.Next() {
-		var outputID types.SiafundOutputID
+		var outputID types.BigfundOutputID
 		var addrID int64
 		var value uint64
 		var spent bool
 
 		if err := rows.Scan(decode(&outputID), &addrID, &value, &spent); err != nil {
-			return nil, fmt.Errorf("failed to scan siafund element: %w", err)
+			return nil, fmt.Errorf("failed to scan bigfund element: %w", err)
 		}
 		balances[addrID] += value
-		log.Debug("deleting orphaned siafund element", zap.Stringer("id", outputID), zap.Uint64("value", value), zap.Bool("spent", spent))
+		log.Debug("deleting orphaned bigfund element", zap.Stringer("id", outputID), zap.Uint64("value", value), zap.Bool("spent", spent))
 	}
 	return balances, rows.Err()
 }
@@ -1313,50 +1313,50 @@ WHERE ci.height=$1 AND ci.block_id<>$2);`, index.Height, encode(index.ID))
 
 // revertOrphans reverts any chain indices that were orphaned by the given index
 func revertOrphans(tx *txn, index types.ChainIndex, log *zap.Logger) error {
-	// fetch orphaned siacoin balances
-	deletedSiacoins, err := deleteOrphanedSiacoinElements(tx, index, log.Named("deleteOrphanedSiacoinElements"))
+	// fetch orphaned bigfile balances
+	deletedBigfiles, err := deleteOrphanedBigfileElements(tx, index, log.Named("deleteOrphanedBigfileElements"))
 	if err != nil {
-		return fmt.Errorf("failed to get orphaned siacoin elements: %w", err)
+		return fmt.Errorf("failed to get orphaned bigfile elements: %w", err)
 	}
 
-	// fetch orphaned siafund balances
-	deletedSiafunds, err := deleteOrphanedSiafundElements(tx, index, log.Named("deleteOrphanedSiafundElements"))
+	// fetch orphaned bigfund balances
+	deletedBigfunds, err := deleteOrphanedBigfundElements(tx, index, log.Named("deleteOrphanedBigfundElements"))
 	if err != nil {
-		return fmt.Errorf("failed to get orphaned siafund elements: %w", err)
+		return fmt.Errorf("failed to get orphaned bigfund elements: %w", err)
 	}
 
-	unspentSiacoins, err := revertSpentOrphanedSiacoinElements(tx, index, log.Named("revertSpentOrphanedSiacoinElements"))
+	unspentBigfiles, err := revertSpentOrphanedBigfileElements(tx, index, log.Named("revertSpentOrphanedBigfileElements"))
 	if err != nil {
-		return fmt.Errorf("failed to revert spent orphaned siacoin elements: %w", err)
+		return fmt.Errorf("failed to revert spent orphaned bigfile elements: %w", err)
 	}
 
-	unspentSiafunds, err := revertSpentOrphanedSiafundElements(tx, index, log.Named("revertSpentOrphanedSiafundElements"))
+	unspentBigfunds, err := revertSpentOrphanedBigfundElements(tx, index, log.Named("revertSpentOrphanedBigfundElements"))
 	if err != nil {
-		return fmt.Errorf("failed to revert spent orphaned siafund elements: %w", err)
+		return fmt.Errorf("failed to revert spent orphaned bigfund elements: %w", err)
 	}
 
 	// get the addrIDs of all affected addresses
 	addrIDs := make(map[int64]bool)
-	for id := range deletedSiacoins {
+	for id := range deletedBigfiles {
 		addrIDs[id] = true
 	}
-	for id := range deletedSiafunds {
+	for id := range deletedBigfunds {
 		addrIDs[id] = true
 	}
-	for id := range unspentSiacoins {
+	for id := range unspentBigfiles {
 		addrIDs[id] = true
 	}
-	for id := range unspentSiafunds {
+	for id := range unspentBigfunds {
 		addrIDs[id] = true
 	}
 
-	getBalanceStmt, err := tx.Prepare(`SELECT siacoin_balance, immature_siacoin_balance, siafund_balance FROM sia_addresses WHERE id=$1`)
+	getBalanceStmt, err := tx.Prepare(`SELECT bigfile_balance, immature_bigfile_balance, bigfund_balance FROM bigfile_addresses WHERE id=$1`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare balance statement: %w", err)
 	}
 	defer getBalanceStmt.Close()
 
-	updateBalanceStmt, err := tx.Prepare(`UPDATE sia_addresses SET siacoin_balance=$1, immature_siacoin_balance=$2, siafund_balance=$3 WHERE id=$4`)
+	updateBalanceStmt, err := tx.Prepare(`UPDATE bigfile_addresses SET bigfile_balance=$1, immature_bigfile_balance=$2, bigfund_balance=$3 WHERE id=$4`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare update statement: %w", err)
 	}
@@ -1364,22 +1364,22 @@ func revertOrphans(tx *txn, index types.ChainIndex, log *zap.Logger) error {
 
 	for addrID := range addrIDs {
 		var existing wallet.Balance
-		err := getBalanceStmt.QueryRow(addrID).Scan(decode(&existing.Siacoins), decode(&existing.ImmatureSiacoins), &existing.Siafunds)
+		err := getBalanceStmt.QueryRow(addrID).Scan(decode(&existing.Bigfiles), decode(&existing.ImmatureBigfiles), &existing.Bigfunds)
 		if err != nil {
 			return fmt.Errorf("failed to get balance: %w", err)
 		}
 
-		existing.Siacoins = existing.Siacoins.Sub(deletedSiacoins[addrID].Siacoins)
-		existing.ImmatureSiacoins = existing.ImmatureSiacoins.Sub(deletedSiacoins[addrID].ImmatureSiacoins)
-		if existing.Siafunds < deletedSiafunds[addrID] {
-			panic("siafund balance cannot be negative")
+		existing.Bigfiles = existing.Bigfiles.Sub(deletedBigfiles[addrID].Bigfiles)
+		existing.ImmatureBigfiles = existing.ImmatureBigfiles.Sub(deletedBigfiles[addrID].ImmatureBigfiles)
+		if existing.Bigfunds < deletedBigfunds[addrID] {
+			panic("bigfund balance cannot be negative")
 		}
-		existing.Siafunds -= deletedSiafunds[addrID]
+		existing.Bigfunds -= deletedBigfunds[addrID]
 
-		existing.Siacoins = existing.Siacoins.Add(unspentSiacoins[addrID].Siacoins)
-		existing.Siafunds += unspentSiafunds[addrID]
+		existing.Bigfiles = existing.Bigfiles.Add(unspentBigfiles[addrID].Bigfiles)
+		existing.Bigfunds += unspentBigfunds[addrID]
 
-		res, err := updateBalanceStmt.Exec(encode(existing.Siacoins), encode(existing.ImmatureSiacoins), existing.Siafunds, addrID)
+		res, err := updateBalanceStmt.Exec(encode(existing.Bigfiles), encode(existing.ImmatureBigfiles), existing.Bigfunds, addrID)
 		if err != nil {
 			return fmt.Errorf("failed to update balance: %w", err)
 		} else if n, err := res.RowsAffected(); err != nil {
@@ -1397,20 +1397,20 @@ func revertOrphans(tx *txn, index types.ChainIndex, log *zap.Logger) error {
 	return err
 }
 
-func pruneSpentSiacoinElements(tx *txn, height uint64) (removed int64, err error) {
-	const query = `DELETE FROM siacoin_elements WHERE spent_index_id IN (SELECT id FROM chain_indices WHERE height <= $1)`
+func pruneSpentBigfileElements(tx *txn, height uint64) (removed int64, err error) {
+	const query = `DELETE FROM bigfile_elements WHERE spent_index_id IN (SELECT id FROM chain_indices WHERE height <= $1)`
 	res, err := tx.Exec(query, height)
 	if err != nil {
-		return 0, fmt.Errorf("failed to query siacoin elements: %w", err)
+		return 0, fmt.Errorf("failed to query bigfile elements: %w", err)
 	}
 	return res.RowsAffected()
 }
 
-func pruneSpentSiafundElements(tx *txn, height uint64) (removed int64, err error) {
-	const query = `DELETE FROM siafund_elements WHERE spent_index_id IN (SELECT id FROM chain_indices WHERE height <= $1)`
+func pruneSpentBigfundElements(tx *txn, height uint64) (removed int64, err error) {
+	const query = `DELETE FROM bigfund_elements WHERE spent_index_id IN (SELECT id FROM chain_indices WHERE height <= $1)`
 	res, err := tx.Exec(query, height)
 	if err != nil {
-		return 0, fmt.Errorf("failed to query siacoin elements: %w", err)
+		return 0, fmt.Errorf("failed to query bigfile elements: %w", err)
 	}
 	return res.RowsAffected()
 }
@@ -1421,7 +1421,7 @@ func setGlobalState(tx *txn, index types.ChainIndex, numLeaves uint64) error {
 }
 
 func addressRefStmt(tx *txn) (func(types.Address) (addressRef, error), func() error, error) {
-	stmt, err := tx.Prepare(`INSERT INTO sia_addresses (sia_address, siacoin_balance, immature_siacoin_balance, siafund_balance) VALUES ($1, $2, $3, $4) ON CONFLICT (sia_address) DO UPDATE SET sia_address=EXCLUDED.sia_address RETURNING id, siacoin_balance, immature_siacoin_balance, siafund_balance`)
+	stmt, err := tx.Prepare(`INSERT INTO bigfile_addresses (bigfile_address, bigfile_balance, immature_bigfile_balance, bigfund_balance) VALUES ($1, $2, $3, $4) ON CONFLICT (bigfile_address) DO UPDATE SET bigfile_address=EXCLUDED.bigfile_address RETURNING id, bigfile_balance, immature_bigfile_balance, bigfund_balance`)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to prepare address statement: %w", err)
 	}

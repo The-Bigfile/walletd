@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/walletd/v2/wallet"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
@@ -175,8 +175,8 @@ func setAdvancedConfig() {
 	setListenAddress("HTTP Address", &cfg.HTTP.Address)
 
 	fmt.Println("")
-	fmt.Println("The syncer address is used to connect to the Sia network.")
-	fmt.Println("It should be reachable from other Sia nodes.")
+	fmt.Println("The syncer address is used to connect to the Bigfile network.")
+	fmt.Println("It should be reachable from other Bigfile nodes.")
 	setListenAddress("Syncer Address", &cfg.Syncer.Address)
 
 	fmt.Println("")

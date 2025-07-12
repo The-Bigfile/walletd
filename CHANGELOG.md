@@ -33,8 +33,8 @@
 - `[POST] /batch/addresses/balance`
 - `[POST] /batch/addresses/events`
 - `[POST] /batch/addresses/unconfirmed`
-- `[POST] /batch/addresses/outputs/siacoin`
-- `[POST] /batch/addresses/outputs/siafund`
+- `[POST] /batch/addresses/outputs/bigfile`
+- `[POST] /batch/addresses/outputs/bigfund`
 
 ## 2.9.0 (2025-05-29)
 
@@ -94,7 +94,7 @@ This new endpoint allows clients to add up to 10000 addresses in a single API ca
             "6cb7dcc6300e8344b17012b36fe64a0d7e1678d54736d1fd910c7c9665b273b9"
         ]
         },
-        "siacoinOutput": {
+        "bigfileOutput": {
         "value": "344000",
         "address": "000000000000000000000000000000000000000000000000000000000000000089eb0d6a8a69"
         },
@@ -210,13 +210,13 @@ Adds support for loading custom network parameters from a local file. This makes
     "transactions": [
       {
         "id": "268ef8627241b3eb505cea69b21379c4b91c21dfc4b3f3f58c66316249058cfd",
-        "siacoinOutputs": [
+        "bigfileOutputs": [
           {
             "value": "1000000000000000000000000000000000000",
             "address": "3d7f707d05f2e0ec7ccc9220ed7c8af3bc560fbee84d068c2cc28151d617899e1ee8bc069946"
           }
         ],
-        "siafundOutputs": [
+        "bigfundOutputs": [
           {
             "value": 10000,
             "address": "053b2def3cbdd078c19d62ce2b4f0b1a3c5e0ffbeeff01280efb1f8969b2f5bb4fdc680f0807"
@@ -234,12 +234,12 @@ Adds support for loading custom network parameters from a local file. This makes
 
 #### Added Spent Element Endpoints
 
-Added two new endpoints `[GET] /outputs/siacoin/:id/spent` and `[GET] /outputs/siafund/:id/spent`. These endpoints will return a boolean, indicating whether the UTXO was spent, and the transaction it was spent in. These endpoints are designed to make verifying Atomic swaps easier.
+Added two new endpoints `[GET] /outputs/bigfile/:id/spent` and `[GET] /outputs/bigfund/:id/spent`. These endpoints will return a boolean, indicating whether the UTXO was spent, and the transaction it was spent in. These endpoints are designed to make verifying Atomic swaps easier.
 
 ##### Example Usage
 
 ````
-$ curl http://localhost:9980/api/outputs/siacoin/9b89152bb967130326702c9bfb51109e9f80274ec314ba58d9ef49b881340f2f/spent
+$ curl http://localhost:9980/api/outputs/bigfile/9b89152bb967130326702c9bfb51109e9f80274ec314ba58d9ef49b881340f2f/spent
 {
     spent: true,
     event: {}
@@ -248,7 +248,7 @@ $ curl http://localhost:9980/api/outputs/siacoin/9b89152bb967130326702c9bfb51109
 
 #### Fixes sending V2 transactions in the UI
 
-- Fixes V2 signing for wallets that do not have siafund outputs. Fixes #247
+- Fixes V2 signing for wallets that do not have bigfund outputs. Fixes #247
 
 ## 2.0.0 (2025-02-21)
 
@@ -257,10 +257,10 @@ $ curl http://localhost:9980/api/outputs/siacoin/9b89152bb967130326702c9bfb51109
 #### Add Merkle Proof Basis to UTXO API Responses
 
 Changes the response to include the Merkle proof basis for the following endpoints:
-- `[GET] /addresses/:address/outputs/siacoin`
-- `[GET] /addresses/:address/outputs/siafund`
-- `[GET] /wallets/:id/outputs/siacoin`
-- `[GET] /wallets/:id/outputs/siafund`
+- `[GET] /addresses/:address/outputs/bigfile`
+- `[GET] /addresses/:address/outputs/bigfund`
+- `[GET] /wallets/:id/outputs/bigfile`
+- `[GET] /wallets/:id/outputs/bigfund`
 
 
 ```json
@@ -280,7 +280,7 @@ Changes the response to include the Merkle proof basis for the following endpoin
                 "102345919e408540d240460b0d84aa2f6da9a3d8f74765fd7c6daae6e46dd7f3"
             ]
             },
-            "siacoinOutput": {
+            "bigfileOutput": {
                 "value": "500000000000000000000000",
                 "address": "fbfc3d034b1eb45f63e0087571ec1f3028a9a2f8c180381d47713e6112467d91f474059476f2"
             },
@@ -299,9 +299,9 @@ The response of `/api/consensus/updates/:index` has been simplified to make it e
 	"applied": [
 		{
 			"update": {
-				"siacoinElements": [
+				"bigfileElements": [
 					{
-						"siacoinElement": {
+						"bigfileElement": {
 							"id": "35b81e41f594d7faeb88bd8eaac2eaa68ce99fe1c8fe5f0cba8fafa65ab3a70e",
 							"stateElement": {
 								"leafIndex": 0,
@@ -309,7 +309,7 @@ The response of `/api/consensus/updates/:index` has been simplified to make it e
 									"88052fa2d1e22e4a5542fed9686cdad3fbeccbc60d15d4fd36a7691d61add1e1"
 								]
 							},
-							"siacoinOutput": {
+							"bigfileOutput": {
 								"value": "1000000000000000000000000000000000000",
 								"address": "3d7f707d05f2e0ec7ccc9220ed7c8af3bc560fbee84d068c2cc28151d617899e1ee8bc069946"
 							},
@@ -402,13 +402,13 @@ The response of `/api/consensus/updates/:index` has been simplified to make it e
 				"transactions": [
 					{
 						"id": "268ef8627241b3eb505cea69b21379c4b91c21dfc4b3f3f58c66316249058cfd",
-						"siacoinOutputs": [
+						"bigfileOutputs": [
 							{
 								"value": "1000000000000000000000000000000000000",
 								"address": "3d7f707d05f2e0ec7ccc9220ed7c8af3bc560fbee84d068c2cc28151d617899e1ee8bc069946"
 							}
 						],
-						"siafundOutputs": [
+						"bigfundOutputs": [
 							{
 								"value": 10000,
 								"address": "053b2def3cbdd078c19d62ce2b4f0b1a3c5e0ffbeeff01280efb1f8969b2f5bb4fdc680f0807"
@@ -420,9 +420,9 @@ The response of `/api/consensus/updates/:index` has been simplified to make it e
 		},
 		{
 			"update": {
-				"siacoinElements": [
+				"bigfileElements": [
 					{
-						"siacoinElement": {
+						"bigfileElement": {
 							"id": "ca02d6807c92f61af94e626604615fbcdb471f38fcd8f3add6c6e6e0485ce090",
 							"stateElement": {
 								"leafIndex": 3,
@@ -431,7 +431,7 @@ The response of `/api/consensus/updates/:index` has been simplified to make it e
 									"134b1f08aec0c7fbc50203a514277d197947e3da3ab1854749bf093b56402912"
 								]
 							},
-							"siacoinOutput": {
+							"bigfileOutput": {
 								"value": "300000000000000000000000000000",
 								"address": "c5e1ca930f193cfe4c72eaed8d3bbae627f67d6c8e32c406fe692b1c00b554f4731fddf2c752"
 							},

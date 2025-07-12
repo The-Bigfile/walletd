@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"go.sia.tech/core/types"
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/walletd/v2/wallet"
 )
 
 // CheckAddresses returns true if any of the addresses have been seen on the
@@ -17,7 +17,7 @@ import (
 // an address is registered with a wallet.
 func (s *Store) CheckAddresses(addresses []types.Address) (known bool, err error) {
 	err = s.transaction(func(tx *txn) error {
-		stmt, err := tx.Prepare(`SELECT true FROM sia_addresses WHERE sia_address=$1`)
+		stmt, err := tx.Prepare(`SELECT true FROM bigfile_addresses WHERE bigfile_address=$1`)
 		if err != nil {
 			return fmt.Errorf("failed to prepare statement: %w", err)
 		}
@@ -45,7 +45,7 @@ func (s *Store) AddressBalance(address ...types.Address) (balance wallet.Balance
 		return wallet.Balance{}, nil // no addresses, no balance
 	}
 	err = s.transaction(func(tx *txn) error {
-		const query = `SELECT siacoin_balance, immature_siacoin_balance, siafund_balance FROM sia_addresses WHERE sia_address=$1`
+		const query = `SELECT bigfile_balance, immature_bigfile_balance, bigfund_balance FROM bigfile_addresses WHERE bigfile_address=$1`
 		stmt, err := tx.Prepare(query)
 		if err != nil {
 			return fmt.Errorf("failed to prepare statement: %w", err)
@@ -53,15 +53,15 @@ func (s *Store) AddressBalance(address ...types.Address) (balance wallet.Balance
 		defer stmt.Close()
 
 		for _, addr := range address {
-			var siacoins, immatureSiacoins types.Currency
-			var siafunds uint64
+			var bigfiles, immatureBigfiles types.Currency
+			var bigfunds uint64
 
-			if err := stmt.QueryRow(encode(addr)).Scan(decode(&siacoins), decode(&immatureSiacoins), &siafunds); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			if err := stmt.QueryRow(encode(addr)).Scan(decode(&bigfiles), decode(&immatureBigfiles), &bigfunds); err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("failed to query address %q: %w", addr, err)
 			}
-			balance.Siacoins = balance.Siacoins.Add(siacoins)
-			balance.ImmatureSiacoins = balance.ImmatureSiacoins.Add(immatureSiacoins)
-			balance.Siafunds += siafunds
+			balance.Bigfiles = balance.Bigfiles.Add(bigfiles)
+			balance.ImmatureBigfiles = balance.ImmatureBigfiles.Add(immatureBigfiles)
+			balance.Bigfunds += bigfunds
 		}
 		return nil
 	})
@@ -95,59 +95,59 @@ func (s *Store) BatchAddressEvents(addresses []types.Address, offset, limit int)
 			seen := make(map[types.Address]bool)
 			switch ev := events[i].Data.(type) {
 			case wallet.EventV1Transaction:
-				for _, sci := range ev.Transaction.SiacoinInputs {
-					addr := sci.UnlockConditions.UnlockHash()
+				for _, bigi := range ev.Transaction.BigfileInputs {
+					addr := bigi.UnlockConditions.UnlockHash()
 					if addressMap[addr] && !seen[addr] {
 						seen[addr] = true
 						events[i].Relevant = append(events[i].Relevant, addr)
 					}
 				}
-				for _, sco := range ev.Transaction.SiacoinOutputs {
-					if addressMap[sco.Address] && !seen[sco.Address] {
-						seen[sco.Address] = true
-						events[i].Relevant = append(events[i].Relevant, sco.Address)
+				for _, bigo := range ev.Transaction.BigfileOutputs {
+					if addressMap[bigo.Address] && !seen[bigo.Address] {
+						seen[bigo.Address] = true
+						events[i].Relevant = append(events[i].Relevant, bigo.Address)
 					}
 				}
-				for _, sfi := range ev.Transaction.SiafundInputs {
-					addr := sfi.UnlockConditions.UnlockHash()
+				for _, bfi := range ev.Transaction.BigfundInputs {
+					addr := bfi.UnlockConditions.UnlockHash()
 					if addressMap[addr] && !seen[addr] {
 						seen[addr] = true
 						events[i].Relevant = append(events[i].Relevant, addr)
 					}
 				}
-				for _, sfo := range ev.Transaction.SiafundOutputs {
-					if addressMap[sfo.Address] && !seen[sfo.Address] {
-						seen[sfo.Address] = true
-						events[i].Relevant = append(events[i].Relevant, sfo.Address)
+				for _, bfo := range ev.Transaction.BigfundOutputs {
+					if addressMap[bfo.Address] && !seen[bfo.Address] {
+						seen[bfo.Address] = true
+						events[i].Relevant = append(events[i].Relevant, bfo.Address)
 					}
 				}
 			case wallet.EventV2Transaction:
-				for _, sci := range ev.SiacoinInputs {
-					if addressMap[sci.Parent.SiacoinOutput.Address] && !seen[sci.Parent.SiacoinOutput.Address] {
-						seen[sci.Parent.SiacoinOutput.Address] = true
-						events[i].Relevant = append(events[i].Relevant, sci.Parent.SiacoinOutput.Address)
+				for _, bigi := range ev.BigfileInputs {
+					if addressMap[bigi.Parent.BigfileOutput.Address] && !seen[bigi.Parent.BigfileOutput.Address] {
+						seen[bigi.Parent.BigfileOutput.Address] = true
+						events[i].Relevant = append(events[i].Relevant, bigi.Parent.BigfileOutput.Address)
 					}
 				}
-				for _, sco := range ev.SiacoinOutputs {
-					if addressMap[sco.Address] && !seen[sco.Address] {
-						seen[sco.Address] = true
-						events[i].Relevant = append(events[i].Relevant, sco.Address)
+				for _, bigo := range ev.BigfileOutputs {
+					if addressMap[bigo.Address] && !seen[bigo.Address] {
+						seen[bigo.Address] = true
+						events[i].Relevant = append(events[i].Relevant, bigo.Address)
 					}
 				}
-				for _, sfi := range ev.SiafundInputs {
-					if addressMap[sfi.Parent.SiafundOutput.Address] && !seen[sfi.Parent.SiafundOutput.Address] {
-						seen[sfi.Parent.SiafundOutput.Address] = true
-						events[i].Relevant = append(events[i].Relevant, sfi.Parent.SiafundOutput.Address)
+				for _, bfi := range ev.BigfundInputs {
+					if addressMap[bfi.Parent.BigfundOutput.Address] && !seen[bfi.Parent.BigfundOutput.Address] {
+						seen[bfi.Parent.BigfundOutput.Address] = true
+						events[i].Relevant = append(events[i].Relevant, bfi.Parent.BigfundOutput.Address)
 					}
 				}
-				for _, sfo := range ev.SiafundOutputs {
-					if addressMap[sfo.Address] && !seen[sfo.Address] {
-						seen[sfo.Address] = true
-						events[i].Relevant = append(events[i].Relevant, sfo.Address)
+				for _, bfo := range ev.BigfundOutputs {
+					if addressMap[bfo.Address] && !seen[bfo.Address] {
+						seen[bfo.Address] = true
+						events[i].Relevant = append(events[i].Relevant, bfo.Address)
 					}
 				}
 			case wallet.EventPayout:
-				events[i].Relevant = append(events[i].Relevant, ev.SiacoinElement.SiacoinOutput.Address)
+				events[i].Relevant = append(events[i].Relevant, ev.BigfileElement.BigfileOutput.Address)
 			}
 		}
 		return nil
@@ -155,19 +155,19 @@ func (s *Store) BatchAddressEvents(addresses []types.Address, offset, limit int)
 	return
 }
 
-// BatchAddressSiacoinOutputs returns the unspent siacoin outputs for an address.
-func (s *Store) BatchAddressSiacoinOutputs(addresses []types.Address, offset, limit int) (siacoins []wallet.UnspentSiacoinElement, basis types.ChainIndex, err error) {
+// BatchAddressBigfileOutputs returns the unspent bigfile outputs for an address.
+func (s *Store) BatchAddressBigfileOutputs(addresses []types.Address, offset, limit int) (bigfiles []wallet.UnspentBigfileElement, basis types.ChainIndex, err error) {
 	err = s.transaction(func(tx *txn) error {
 		basis, err = getScanBasis(tx)
 		if err != nil {
 			return fmt.Errorf("failed to get basis: %w", err)
 		}
 
-		query := `SELECT se.id, se.siacoin_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.sia_address, ci.height 
-		FROM siacoin_elements se
+		query := `SELECT se.id, se.bigfile_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.bigfile_address, ci.height 
+		FROM bigfile_elements se
 		INNER JOIN chain_indices ci ON (se.chain_index_id = ci.id)
-		INNER JOIN sia_addresses sa ON (se.address_id = sa.id)
-		WHERE sa.sia_address IN (` + queryPlaceHolders(len(addresses)) + `) AND se.maturity_height <= ? AND se.spent_index_id IS NULL
+		INNER JOIN bigfile_addresses sa ON (se.address_id = sa.id)
+		WHERE sa.bigfile_address IN (` + queryPlaceHolders(len(addresses)) + `) AND se.maturity_height <= ? AND se.spent_index_id IS NULL
 		LIMIT ? OFFSET ?`
 
 		rows, err := tx.Query(query, append(encodeSlice(addresses), basis.Height, limit, offset)...)
@@ -177,21 +177,21 @@ func (s *Store) BatchAddressSiacoinOutputs(addresses []types.Address, offset, li
 		defer rows.Close()
 
 		for rows.Next() {
-			siacoin, err := scanUnspentSiacoinElement(rows, basis.Height)
+			bigfile, err := scanUnspentBigfileElement(rows, basis.Height)
 			if err != nil {
-				return fmt.Errorf("failed to scan siacoin element: %w", err)
+				return fmt.Errorf("failed to scan bigfile element: %w", err)
 			}
 
-			siacoins = append(siacoins, siacoin)
+			bigfiles = append(bigfiles, bigfile)
 		}
 		if err := rows.Err(); err != nil {
 			return err
 		}
 
-		// retrieve the merkle proofs for the siacoin elements
+		// retrieve the merkle proofs for the bigfile elements
 		if s.indexMode == wallet.IndexModeFull {
-			indices := make([]uint64, len(siacoins))
-			for i, se := range siacoins {
+			indices := make([]uint64, len(bigfiles))
+			for i, se := range bigfiles {
 				indices[i] = se.StateElement.LeafIndex
 			}
 			proofs, err := fillElementProofs(tx, indices)
@@ -199,7 +199,7 @@ func (s *Store) BatchAddressSiacoinOutputs(addresses []types.Address, offset, li
 				return fmt.Errorf("failed to fill element proofs: %w", err)
 			}
 			for i, proof := range proofs {
-				siacoins[i].StateElement.MerkleProof = proof
+				bigfiles[i].StateElement.MerkleProof = proof
 			}
 		}
 		return nil
@@ -207,19 +207,19 @@ func (s *Store) BatchAddressSiacoinOutputs(addresses []types.Address, offset, li
 	return
 }
 
-// BatchAddressSiafundOutputs returns the unspent siafund outputs for an address.
-func (s *Store) BatchAddressSiafundOutputs(addresses []types.Address, offset, limit int) (siafunds []wallet.UnspentSiafundElement, basis types.ChainIndex, err error) {
+// BatchAddressBigfundOutputs returns the unspent bigfund outputs for an address.
+func (s *Store) BatchAddressBigfundOutputs(addresses []types.Address, offset, limit int) (bigfunds []wallet.UnspentBigfundElement, basis types.ChainIndex, err error) {
 	err = s.transaction(func(tx *txn) error {
 		basis, err = getScanBasis(tx)
 		if err != nil {
 			return fmt.Errorf("failed to get basis: %w", err)
 		}
 
-		query := `SELECT se.id, se.leaf_index, se.merkle_proof, se.siafund_value, se.claim_start, sa.sia_address, ci.height
-		FROM siafund_elements se
+		query := `SELECT se.id, se.leaf_index, se.merkle_proof, se.bigfund_value, se.claim_start, sa.bigfile_address, ci.height
+		FROM bigfund_elements se
 		INNER JOIN chain_indices ci ON (se.chain_index_id = ci.id)
-		INNER JOIN sia_addresses sa ON (se.address_id = sa.id)
-		WHERE sa.sia_address IN(` + queryPlaceHolders(len(addresses)) + `) AND se.spent_index_id IS NULL
+		INNER JOIN bigfile_addresses sa ON (se.address_id = sa.id)
+		WHERE sa.bigfile_address IN(` + queryPlaceHolders(len(addresses)) + `) AND se.spent_index_id IS NULL
 		ORDER BY se.id DESC
 		LIMIT ? OFFSET ?`
 
@@ -230,20 +230,20 @@ func (s *Store) BatchAddressSiafundOutputs(addresses []types.Address, offset, li
 		defer rows.Close()
 
 		for rows.Next() {
-			siafund, err := scanUnspentSiafundElement(rows, basis.Height)
+			bigfund, err := scanUnspentBigfundElement(rows, basis.Height)
 			if err != nil {
-				return fmt.Errorf("failed to scan siafund element: %w", err)
+				return fmt.Errorf("failed to scan bigfund element: %w", err)
 			}
-			siafunds = append(siafunds, siafund)
+			bigfunds = append(bigfunds, bigfund)
 		}
 		if err := rows.Err(); err != nil {
 			return err
 		}
 
-		// retrieve the merkle proofs for the siafund elements
+		// retrieve the merkle proofs for the bigfund elements
 		if s.indexMode == wallet.IndexModeFull {
-			indices := make([]uint64, len(siafunds))
-			for i, se := range siafunds {
+			indices := make([]uint64, len(bigfunds))
+			for i, se := range bigfunds {
 				indices[i] = se.StateElement.LeafIndex
 			}
 			proofs, err := fillElementProofs(tx, indices)
@@ -251,7 +251,7 @@ func (s *Store) BatchAddressSiafundOutputs(addresses []types.Address, offset, li
 				return fmt.Errorf("failed to fill element proofs: %w", err)
 			}
 			for i, proof := range proofs {
-				siafunds[i].StateElement.MerkleProof = proof
+				bigfunds[i].StateElement.MerkleProof = proof
 			}
 		}
 		return nil
@@ -280,19 +280,19 @@ func (s *Store) AddressEvents(address types.Address, offset, limit int) (events 
 	return
 }
 
-// AddressSiacoinOutputs returns the unspent siacoin outputs for an address.
-func (s *Store) AddressSiacoinOutputs(address types.Address, tpoolSpent []types.SiacoinOutputID, offset, limit int) (siacoins []wallet.UnspentSiacoinElement, basis types.ChainIndex, err error) {
+// AddressBigfileOutputs returns the unspent bigfile outputs for an address.
+func (s *Store) AddressBigfileOutputs(address types.Address, tpoolSpent []types.BigfileOutputID, offset, limit int) (bigfiles []wallet.UnspentBigfileElement, basis types.ChainIndex, err error) {
 	err = s.transaction(func(tx *txn) error {
 		basis, err = getScanBasis(tx)
 		if err != nil {
 			return fmt.Errorf("failed to get basis: %w", err)
 		}
 
-		query := `SELECT se.id, se.siacoin_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.sia_address, ci.height 
-		FROM siacoin_elements se
+		query := `SELECT se.id, se.bigfile_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.bigfile_address, ci.height 
+		FROM bigfile_elements se
 		INNER JOIN chain_indices ci ON (se.chain_index_id = ci.id)
-		INNER JOIN sia_addresses sa ON (se.address_id = sa.id)
-		WHERE sa.sia_address = ? AND se.maturity_height <= ? AND se.spent_index_id IS NULL`
+		INNER JOIN bigfile_addresses sa ON (se.address_id = sa.id)
+		WHERE sa.bigfile_address = ? AND se.maturity_height <= ? AND se.spent_index_id IS NULL`
 
 		params := []any{encode(address), basis.Height}
 		if len(tpoolSpent) > 0 {
@@ -312,21 +312,21 @@ func (s *Store) AddressSiacoinOutputs(address types.Address, tpoolSpent []types.
 		defer rows.Close()
 
 		for rows.Next() {
-			siacoin, err := scanUnspentSiacoinElement(rows, basis.Height)
+			bigfile, err := scanUnspentBigfileElement(rows, basis.Height)
 			if err != nil {
-				return fmt.Errorf("failed to scan siacoin element: %w", err)
+				return fmt.Errorf("failed to scan bigfile element: %w", err)
 			}
 
-			siacoins = append(siacoins, siacoin)
+			bigfiles = append(bigfiles, bigfile)
 		}
 		if err := rows.Err(); err != nil {
 			return err
 		}
 
-		// retrieve the merkle proofs for the siacoin elements
+		// retrieve the merkle proofs for the bigfile elements
 		if s.indexMode == wallet.IndexModeFull {
-			indices := make([]uint64, len(siacoins))
-			for i, se := range siacoins {
+			indices := make([]uint64, len(bigfiles))
+			for i, se := range bigfiles {
 				indices[i] = se.StateElement.LeafIndex
 			}
 			proofs, err := fillElementProofs(tx, indices)
@@ -334,7 +334,7 @@ func (s *Store) AddressSiacoinOutputs(address types.Address, tpoolSpent []types.
 				return fmt.Errorf("failed to fill element proofs: %w", err)
 			}
 			for i, proof := range proofs {
-				siacoins[i].StateElement.MerkleProof = proof
+				bigfiles[i].StateElement.MerkleProof = proof
 			}
 		}
 		return nil
@@ -342,19 +342,19 @@ func (s *Store) AddressSiacoinOutputs(address types.Address, tpoolSpent []types.
 	return
 }
 
-// AddressSiafundOutputs returns the unspent siafund outputs for an address.
-func (s *Store) AddressSiafundOutputs(address types.Address, tpoolSpent []types.SiafundOutputID, offset, limit int) (siafunds []wallet.UnspentSiafundElement, basis types.ChainIndex, err error) {
+// AddressBigfundOutputs returns the unspent bigfund outputs for an address.
+func (s *Store) AddressBigfundOutputs(address types.Address, tpoolSpent []types.BigfundOutputID, offset, limit int) (bigfunds []wallet.UnspentBigfundElement, basis types.ChainIndex, err error) {
 	err = s.transaction(func(tx *txn) error {
 		basis, err = getScanBasis(tx)
 		if err != nil {
 			return fmt.Errorf("failed to get basis: %w", err)
 		}
 
-		query := `SELECT se.id, se.leaf_index, se.merkle_proof, se.siafund_value, se.claim_start, sa.sia_address, ci.height
-		FROM siafund_elements se
+		query := `SELECT se.id, se.leaf_index, se.merkle_proof, se.bigfund_value, se.claim_start, sa.bigfile_address, ci.height
+		FROM bigfund_elements se
 		INNER JOIN chain_indices ci ON (se.chain_index_id = ci.id)
-		INNER JOIN sia_addresses sa ON (se.address_id = sa.id)
-		WHERE sa.sia_address=? AND se.spent_index_id IS NULL`
+		INNER JOIN bigfile_addresses sa ON (se.address_id = sa.id)
+		WHERE sa.bigfile_address=? AND se.spent_index_id IS NULL`
 
 		params := []any{encode(address)}
 
@@ -375,20 +375,20 @@ func (s *Store) AddressSiafundOutputs(address types.Address, tpoolSpent []types.
 		defer rows.Close()
 
 		for rows.Next() {
-			siafund, err := scanUnspentSiafundElement(rows, basis.Height)
+			bigfund, err := scanUnspentBigfundElement(rows, basis.Height)
 			if err != nil {
-				return fmt.Errorf("failed to scan siafund element: %w", err)
+				return fmt.Errorf("failed to scan bigfund element: %w", err)
 			}
-			siafunds = append(siafunds, siafund)
+			bigfunds = append(bigfunds, bigfund)
 		}
 		if err := rows.Err(); err != nil {
 			return err
 		}
 
-		// retrieve the merkle proofs for the siafund elements
+		// retrieve the merkle proofs for the bigfund elements
 		if s.indexMode == wallet.IndexModeFull {
-			indices := make([]uint64, len(siafunds))
-			for i, se := range siafunds {
+			indices := make([]uint64, len(bigfunds))
+			for i, se := range bigfunds {
 				indices[i] = se.StateElement.LeafIndex
 			}
 			proofs, err := fillElementProofs(tx, indices)
@@ -396,7 +396,7 @@ func (s *Store) AddressSiafundOutputs(address types.Address, tpoolSpent []types.
 				return fmt.Errorf("failed to fill element proofs: %w", err)
 			}
 			for i, proof := range proofs {
-				siafunds[i].StateElement.MerkleProof = proof
+				bigfunds[i].StateElement.MerkleProof = proof
 			}
 		}
 		return nil
@@ -405,52 +405,52 @@ func (s *Store) AddressSiafundOutputs(address types.Address, tpoolSpent []types.
 }
 
 // AnnotateV1Events annotates a list of unconfirmed transactions with
-// relevant addresses and siacoin/siafund elements.
+// relevant addresses and bigfile/bigfund elements.
 func (s *Store) AnnotateV1Events(index types.ChainIndex, timestamp time.Time, v1 []types.Transaction) (annotated []wallet.Event, err error) {
 	err = s.transaction(func(tx *txn) error {
-		siacoinElementStmt, err := tx.Prepare(`SELECT se.id, se.siacoin_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.sia_address
-		FROM siacoin_elements se
-		INNER JOIN sia_addresses sa ON (se.address_id = sa.id)
+		bigfileElementStmt, err := tx.Prepare(`SELECT se.id, se.bigfile_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.bigfile_address
+		FROM bigfile_elements se
+		INNER JOIN bigfile_addresses sa ON (se.address_id = sa.id)
 		WHERE se.id=$1`)
 		if err != nil {
-			return fmt.Errorf("failed to prepare siacoin statement: %w", err)
+			return fmt.Errorf("failed to prepare bigfile statement: %w", err)
 		}
-		defer siacoinElementStmt.Close()
+		defer bigfileElementStmt.Close()
 
-		siacoinElementCache := make(map[types.SiacoinOutputID]types.SiacoinElement)
-		fetchSiacoinElement := func(id types.SiacoinOutputID) (types.SiacoinElement, error) {
-			if se, ok := siacoinElementCache[id]; ok {
+		bigfileElementCache := make(map[types.BigfileOutputID]types.BigfileElement)
+		fetchBigfileElement := func(id types.BigfileOutputID) (types.BigfileElement, error) {
+			if se, ok := bigfileElementCache[id]; ok {
 				return se, nil
 			}
 
-			se, err := scanSiacoinElement(siacoinElementStmt.QueryRow(encode(id)))
+			se, err := scanBigfileElement(bigfileElementStmt.QueryRow(encode(id)))
 			if err != nil {
-				return types.SiacoinElement{}, fmt.Errorf("failed to fetch siacoin element: %w", err)
+				return types.BigfileElement{}, fmt.Errorf("failed to fetch bigfile element: %w", err)
 			}
-			siacoinElementCache[id] = se
+			bigfileElementCache[id] = se
 			return se, nil
 		}
 
-		siafundElementStmt, err := tx.Prepare(`SELECT se.id, se.leaf_index, se.merkle_proof, se.siafund_value, se.claim_start, sa.sia_address
-		FROM siafund_elements se
-		INNER JOIN sia_addresses sa ON (se.address_id = sa.id)
+		bigfundElementStmt, err := tx.Prepare(`SELECT se.id, se.leaf_index, se.merkle_proof, se.bigfund_value, se.claim_start, sa.bigfile_address
+		FROM bigfund_elements se
+		INNER JOIN bigfile_addresses sa ON (se.address_id = sa.id)
 		WHERE se.id=$1`)
 		if err != nil {
-			return fmt.Errorf("failed to prepare siafund statement: %w", err)
+			return fmt.Errorf("failed to prepare bigfund statement: %w", err)
 		}
-		defer siafundElementStmt.Close()
+		defer bigfundElementStmt.Close()
 
-		siafundElementCache := make(map[types.SiafundOutputID]types.SiafundElement)
-		fetchSiafundElement := func(id types.SiafundOutputID) (types.SiafundElement, error) {
-			if se, ok := siafundElementCache[id]; ok {
+		bigfundElementCache := make(map[types.BigfundOutputID]types.BigfundElement)
+		fetchBigfundElement := func(id types.BigfundOutputID) (types.BigfundElement, error) {
+			if se, ok := bigfundElementCache[id]; ok {
 				return se, nil
 			}
 
-			se, err := scanSiafundElement(siafundElementStmt.QueryRow(encode(id)))
+			se, err := scanBigfundElement(bigfundElementStmt.QueryRow(encode(id)))
 			if err != nil {
-				return types.SiafundElement{}, fmt.Errorf("failed to fetch siafund element: %w", err)
+				return types.BigfundElement{}, fmt.Errorf("failed to fetch bigfund element: %w", err)
 			}
-			siafundElementCache[id] = se
+			bigfundElementCache[id] = se
 			return se, nil
 		}
 
@@ -471,51 +471,51 @@ func (s *Store) AnnotateV1Events(index types.ChainIndex, timestamp time.Time, v1
 				Transaction: txn,
 			}
 
-			for _, input := range txn.SiacoinInputs {
-				// fetch the siacoin element
-				sce, err := fetchSiacoinElement(input.ParentID)
+			for _, input := range txn.BigfileInputs {
+				// fetch the bigfile element
+				bige, err := fetchBigfileElement(input.ParentID)
 				if errors.Is(err, sql.ErrNoRows) {
 					continue // ignore elements that are not found
 				} else if err != nil {
-					return fmt.Errorf("failed to fetch siacoin element %q: %w", input.ParentID, err)
+					return fmt.Errorf("failed to fetch bigfile element %q: %w", input.ParentID, err)
 				}
-				ev.SpentSiacoinElements = append(ev.SpentSiacoinElements, sce)
+				ev.SpentBigfileElements = append(ev.SpentBigfileElements, bige)
 				relevant = true
 			}
 
-			for i, output := range txn.SiacoinOutputs {
-				sce := types.SiacoinElement{
-					ID: txn.SiacoinOutputID(i),
+			for i, output := range txn.BigfileOutputs {
+				bige := types.BigfileElement{
+					ID: txn.BigfileOutputID(i),
 					StateElement: types.StateElement{
 						LeafIndex: types.UnassignedLeafIndex,
 					},
-					SiacoinOutput: output,
+					BigfileOutput: output,
 				}
-				siacoinElementCache[sce.ID] = sce
+				bigfileElementCache[bige.ID] = bige
 				relevant = true
 			}
 
-			for _, input := range txn.SiafundInputs {
-				// fetch the siafund element
-				sfe, err := fetchSiafundElement(input.ParentID)
+			for _, input := range txn.BigfundInputs {
+				// fetch the bigfund element
+				bfe, err := fetchBigfundElement(input.ParentID)
 				if errors.Is(err, sql.ErrNoRows) {
 					continue // ignore elements that are not found
 				} else if err != nil {
-					return fmt.Errorf("failed to fetch siafund element %q: %w", input.ParentID, err)
+					return fmt.Errorf("failed to fetch bigfund element %q: %w", input.ParentID, err)
 				}
-				ev.SpentSiafundElements = append(ev.SpentSiafundElements, sfe)
+				ev.SpentBigfundElements = append(ev.SpentBigfundElements, bfe)
 				relevant = true
 			}
 
-			for i, output := range txn.SiafundOutputs {
-				sfe := types.SiafundElement{
-					ID: txn.SiafundOutputID(i),
+			for i, output := range txn.BigfundOutputs {
+				bfe := types.BigfundElement{
+					ID: txn.BigfundOutputID(i),
 					StateElement: types.StateElement{
 						LeafIndex: types.UnassignedLeafIndex,
 					},
-					SiafundOutput: output,
+					BigfundOutput: output,
 				}
-				siafundElementCache[sfe.ID] = sfe
+				bigfundElementCache[bfe.ID] = bfe
 				relevant = true
 			}
 
@@ -533,8 +533,8 @@ func (s *Store) AnnotateV1Events(index types.ChainIndex, timestamp time.Time, v1
 func getAddressEvents(tx *txn, address types.Address, offset, limit int) (eventIDs []int64, err error) {
 	const query = `SELECT DISTINCT ea.event_id
 FROM event_addresses ea
-INNER JOIN sia_addresses sa ON ea.address_id = sa.id
-WHERE sa.sia_address = $1
+INNER JOIN bigfile_addresses sa ON ea.address_id = sa.id
+WHERE sa.bigfile_address = $1
 ORDER BY ea.event_maturity_height DESC, ea.event_id DESC
 LIMIT $2 OFFSET $3;`
 
@@ -561,8 +561,8 @@ func (s *Store) getAddressesEvents(tx *txn, addresses []types.Address, offset, l
 
 	query := `SELECT DISTINCT ea.event_id
 FROM event_addresses ea
-INNER JOIN sia_addresses sa ON ea.address_id = sa.id
-WHERE sa.sia_address IN (` + queryPlaceHolders(len(addresses)) + `)
+INNER JOIN bigfile_addresses sa ON ea.address_id = sa.id
+WHERE sa.bigfile_address IN (` + queryPlaceHolders(len(addresses)) + `)
 ORDER BY ea.event_maturity_height DESC, ea.event_id DESC
 LIMIT ? OFFSET ?;`
 

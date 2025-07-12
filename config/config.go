@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/walletd/v2/wallet"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )

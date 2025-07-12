@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/chain"
-	"go.sia.tech/jape"
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/chain"
+	"go.thebigfile.com/jape"
+	"go.thebigfile.com/walletd/v2/wallet"
 )
 
 // A Client provides methods for interacting with a walletd API server.
@@ -271,17 +271,17 @@ func (c *Client) AddressUnconfirmedEvents(addr types.Address) (resp []wallet.Eve
 	return
 }
 
-// AddressSiacoinOutputs returns the unspent siacoin outputs for an address.
-func (c *Client) AddressSiacoinOutputs(addr types.Address, useTpool bool, offset, limit int) ([]wallet.UnspentSiacoinElement, types.ChainIndex, error) {
-	var resp UnspentSiacoinElementsResponse
-	err := c.c.GET(context.Background(), fmt.Sprintf("/addresses/%v/outputs/siacoin?offset=%d&limit=%d&tpool=%t", addr, offset, limit, useTpool), &resp)
+// AddressBigfileOutputs returns the unspent bigfile outputs for an address.
+func (c *Client) AddressBigfileOutputs(addr types.Address, useTpool bool, offset, limit int) ([]wallet.UnspentBigfileElement, types.ChainIndex, error) {
+	var resp UnspentBigfileElementsResponse
+	err := c.c.GET(context.Background(), fmt.Sprintf("/addresses/%v/outputs/bigfile?offset=%d&limit=%d&tpool=%t", addr, offset, limit, useTpool), &resp)
 	return resp.Outputs, resp.Basis, err
 }
 
-// AddressSiafundOutputs returns the unspent siafund outputs for an address.
-func (c *Client) AddressSiafundOutputs(addr types.Address, useTpool bool, offset, limit int) ([]wallet.UnspentSiafundElement, types.ChainIndex, error) {
-	var resp UnspentSiafundElementsResponse
-	err := c.c.GET(context.Background(), fmt.Sprintf("/addresses/%v/outputs/siafund?offset=%d&limit=%d&tpool=%t", addr, offset, limit, useTpool), &resp)
+// AddressBigfundOutputs returns the unspent bigfund outputs for an address.
+func (c *Client) AddressBigfundOutputs(addr types.Address, useTpool bool, offset, limit int) ([]wallet.UnspentBigfundElement, types.ChainIndex, error) {
+	var resp UnspentBigfundElementsResponse
+	err := c.c.GET(context.Background(), fmt.Sprintf("/addresses/%v/outputs/bigfund?offset=%d&limit=%d&tpool=%t", addr, offset, limit, useTpool), &resp)
 	return resp.Outputs, resp.Basis, err
 }
 
@@ -294,19 +294,19 @@ func (c *Client) BatchAddressBalance(addresses []types.Address) (BalanceResponse
 	return resp, err
 }
 
-// BatchAddressSiacoinOutputs returns the unspent siacoin outputs for a batch of addresses.
-func (c *Client) BatchAddressSiacoinOutputs(addresses []types.Address, offset, limit int) ([]wallet.UnspentSiacoinElement, types.ChainIndex, error) {
-	var resp AddressSiacoinElementsResponse
-	err := c.c.POST(context.Background(), fmt.Sprintf("/batch/addresses/outputs/siacoin?offset=%d&limit=%d", offset, limit), BatchAddressesRequest{
+// BatchAddressBigfileOutputs returns the unspent bigfile outputs for a batch of addresses.
+func (c *Client) BatchAddressBigfileOutputs(addresses []types.Address, offset, limit int) ([]wallet.UnspentBigfileElement, types.ChainIndex, error) {
+	var resp AddressBigfileElementsResponse
+	err := c.c.POST(context.Background(), fmt.Sprintf("/batch/addresses/outputs/bigfile?offset=%d&limit=%d", offset, limit), BatchAddressesRequest{
 		Addresses: addresses,
 	}, &resp)
 	return resp.Outputs, resp.Basis, err
 }
 
-// BatchAddressSiafundOutputs returns the unspent siafund outputs for a batch of addresses.
-func (c *Client) BatchAddressSiafundOutputs(addresses []types.Address, offset, limit int) ([]wallet.UnspentSiafundElement, types.ChainIndex, error) {
-	var resp AddressSiafundElementsResponse
-	err := c.c.POST(context.Background(), fmt.Sprintf("/batch/addresses/outputs/siafund?offset=%d&limit=%d", offset, limit), BatchAddressesRequest{
+// BatchAddressBigfundOutputs returns the unspent bigfund outputs for a batch of addresses.
+func (c *Client) BatchAddressBigfundOutputs(addresses []types.Address, offset, limit int) ([]wallet.UnspentBigfundElement, types.ChainIndex, error) {
+	var resp AddressBigfundElementsResponse
+	err := c.c.POST(context.Background(), fmt.Sprintf("/batch/addresses/outputs/bigfund?offset=%d&limit=%d", offset, limit), BatchAddressesRequest{
 		Addresses: addresses,
 	}, &resp)
 	return resp.Outputs, resp.Basis, err
@@ -343,17 +343,17 @@ func (c *Client) TPoolEvents() (resp []wallet.Event, err error) {
 	return
 }
 
-// SpentSiacoinElement returns whether a siacoin output has been spent and the
+// SpentBigfileElement returns whether a bigfile output has been spent and the
 // event that spent it.
-func (c *Client) SpentSiacoinElement(id types.SiacoinOutputID) (resp ElementSpentResponse, err error) {
-	err = c.c.GET(context.Background(), fmt.Sprintf("/outputs/siacoin/%v/spent", id), &resp)
+func (c *Client) SpentBigfileElement(id types.BigfileOutputID) (resp ElementSpentResponse, err error) {
+	err = c.c.GET(context.Background(), fmt.Sprintf("/outputs/bigfile/%v/spent", id), &resp)
 	return
 }
 
-// SpentSiafundElement returns whether a siafund output has been spent and the
+// SpentBigfundElement returns whether a bigfund output has been spent and the
 // event that spent it.
-func (c *Client) SpentSiafundElement(id types.SiafundOutputID) (resp ElementSpentResponse, err error) {
-	err = c.c.GET(context.Background(), fmt.Sprintf("/outputs/siafund/%v/spent", id), &resp)
+func (c *Client) SpentBigfundElement(id types.BigfundOutputID) (resp ElementSpentResponse, err error) {
+	err = c.c.GET(context.Background(), fmt.Sprintf("/outputs/bigfund/%v/spent", id), &resp)
 	return
 }
 
@@ -408,39 +408,39 @@ func (c *WalletClient) UnconfirmedEvents() (resp []wallet.Event, err error) {
 	return
 }
 
-// SiacoinOutputs returns the set of unspent outputs controlled by the wallet.
-func (c *WalletClient) SiacoinOutputs(offset, limit int) ([]wallet.UnspentSiacoinElement, types.ChainIndex, error) {
-	var resp UnspentSiacoinElementsResponse
-	err := c.c.GET(context.Background(), fmt.Sprintf("/wallets/%v/outputs/siacoin?offset=%d&limit=%d", c.id, offset, limit), &resp)
+// BigfileOutputs returns the set of unspent outputs controlled by the wallet.
+func (c *WalletClient) BigfileOutputs(offset, limit int) ([]wallet.UnspentBigfileElement, types.ChainIndex, error) {
+	var resp UnspentBigfileElementsResponse
+	err := c.c.GET(context.Background(), fmt.Sprintf("/wallets/%v/outputs/bigfile?offset=%d&limit=%d", c.id, offset, limit), &resp)
 	return resp.Outputs, resp.Basis, err
 }
 
-// SiafundOutputs returns the set of unspent outputs controlled by the wallet.
-func (c *WalletClient) SiafundOutputs(offset, limit int) ([]wallet.UnspentSiafundElement, types.ChainIndex, error) {
-	var resp UnspentSiafundElementsResponse
-	err := c.c.GET(context.Background(), fmt.Sprintf("/wallets/%v/outputs/siafund?offset=%d&limit=%d", c.id, offset, limit), &resp)
+// BigfundOutputs returns the set of unspent outputs controlled by the wallet.
+func (c *WalletClient) BigfundOutputs(offset, limit int) ([]wallet.UnspentBigfundElement, types.ChainIndex, error) {
+	var resp UnspentBigfundElementsResponse
+	err := c.c.GET(context.Background(), fmt.Sprintf("/wallets/%v/outputs/bigfund?offset=%d&limit=%d", c.id, offset, limit), &resp)
 	return resp.Outputs, resp.Basis, err
 }
 
 // Reserve reserves a set outputs for use in a transaction.
-func (c *WalletClient) Reserve(sc []types.SiacoinOutputID, sf []types.SiafundOutputID, duration time.Duration) (err error) {
+func (c *WalletClient) Reserve(sc []types.BigfileOutputID, sf []types.BigfundOutputID, duration time.Duration) (err error) {
 	err = c.c.POST(context.Background(), fmt.Sprintf("/wallets/%v/reserve", c.id), WalletReserveRequest{
-		SiacoinOutputs: sc,
-		SiafundOutputs: sf,
+		BigfileOutputs: sc,
+		BigfundOutputs: sf,
 	}, nil)
 	return
 }
 
 // Release releases a set of previously-reserved outputs.
-func (c *WalletClient) Release(sc []types.SiacoinOutputID, sf []types.SiafundOutputID) (err error) {
+func (c *WalletClient) Release(sc []types.BigfileOutputID, sf []types.BigfundOutputID) (err error) {
 	err = c.c.POST(context.Background(), fmt.Sprintf("/wallets/%v/release", c.id), WalletReleaseRequest{
-		SiacoinOutputs: sc,
-		SiafundOutputs: sf,
+		BigfileOutputs: sc,
+		BigfundOutputs: sf,
 	}, nil)
 	return
 }
 
-// Fund funds a siacoin transaction.
+// Fund funds a bigfile transaction.
 func (c *WalletClient) Fund(txn types.Transaction, amount types.Currency, changeAddr types.Address) (resp WalletFundResponse, err error) {
 	err = c.c.POST(context.Background(), fmt.Sprintf("/wallets/%v/fund", c.id), WalletFundRequest{
 		Transaction:   txn,
@@ -450,7 +450,7 @@ func (c *WalletClient) Fund(txn types.Transaction, amount types.Currency, change
 	return
 }
 
-// FundSF funds a siafund transaction.
+// FundSF funds a bigfund transaction.
 func (c *WalletClient) FundSF(txn types.Transaction, amount uint64, changeAddr, claimAddr types.Address) (resp WalletFundResponse, err error) {
 	err = c.c.POST(context.Background(), fmt.Sprintf("/wallets/%v/fundsf", c.id), WalletFundSFRequest{
 		Transaction:   txn,
@@ -461,23 +461,23 @@ func (c *WalletClient) FundSF(txn types.Transaction, amount uint64, changeAddr, 
 	return
 }
 
-// Construct constructs a transaction sending the specified Siacoins or Siafunds to the recipients. The transaction is returned
+// Construct constructs a transaction sending the specified Bigfiles or Bigfunds to the recipients. The transaction is returned
 // along with its ID and calculated miner fee. The transaction will need to be signed before broadcasting.
-func (c *WalletClient) Construct(siacoins []types.SiacoinOutput, siafunds []types.SiafundOutput, change types.Address) (resp WalletConstructResponse, err error) {
+func (c *WalletClient) Construct(bigfiles []types.BigfileOutput, bigfunds []types.BigfundOutput, change types.Address) (resp WalletConstructResponse, err error) {
 	err = c.c.POST(context.Background(), fmt.Sprintf("/wallets/%v/construct/transaction", c.id), WalletConstructRequest{
-		Siacoins:      siacoins,
-		Siafunds:      siafunds,
+		Bigfiles:      bigfiles,
+		Bigfunds:      bigfunds,
 		ChangeAddress: change,
 	}, &resp)
 	return
 }
 
-// ConstructV2 constructs a V2 transaction sending the specified Siacoins or Siafunds to the recipients. The transaction is returned
+// ConstructV2 constructs a V2 transaction sending the specified Bigfiles or Bigfunds to the recipients. The transaction is returned
 // along with its ID and calculated miner fee. The transaction will need to be signed before broadcasting.
-func (c *WalletClient) ConstructV2(siacoins []types.SiacoinOutput, siafunds []types.SiafundOutput, change types.Address) (resp WalletConstructV2Response, err error) {
+func (c *WalletClient) ConstructV2(bigfiles []types.BigfileOutput, bigfunds []types.BigfundOutput, change types.Address) (resp WalletConstructV2Response, err error) {
 	err = c.c.POST(context.Background(), fmt.Sprintf("/wallets/%v/construct/v2/transaction", c.id), WalletConstructRequest{
-		Siacoins:      siacoins,
-		Siafunds:      siafunds,
+		Bigfiles:      bigfiles,
+		Bigfunds:      bigfunds,
 		ChangeAddress: change,
 	}, &resp)
 	return

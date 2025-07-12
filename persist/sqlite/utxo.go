@@ -5,26 +5,26 @@ import (
 	"errors"
 	"fmt"
 
-	"go.sia.tech/core/types"
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/walletd/v2/wallet"
 )
 
-func getSiacoinElement(tx *txn, id types.SiacoinOutputID, indexMode wallet.IndexMode) (ele types.SiacoinElement, err error) {
-	const query = `SELECT se.id, se.siacoin_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.sia_address 
-FROM siacoin_elements se
-INNER JOIN sia_addresses sa ON (se.address_id = sa.id)
+func getBigfileElement(tx *txn, id types.BigfileOutputID, indexMode wallet.IndexMode) (ele types.BigfileElement, err error) {
+	const query = `SELECT se.id, se.bigfile_value, se.merkle_proof, se.leaf_index, se.maturity_height, sa.bigfile_address 
+FROM bigfile_elements se
+INNER JOIN bigfile_addresses sa ON (se.address_id = sa.id)
 WHERE se.id=$1 AND spent_index_id IS NULL`
 
-	ele, err = scanSiacoinElement(tx.QueryRow(query, encode(id)))
+	ele, err = scanBigfileElement(tx.QueryRow(query, encode(id)))
 	if err != nil {
-		return types.SiacoinElement{}, err
+		return types.BigfileElement{}, err
 	}
 
-	// retrieve the merkle proofs for the siacoin element
+	// retrieve the merkle proofs for the bigfile element
 	if indexMode == wallet.IndexModeFull {
 		proof, err := fillElementProofs(tx, []uint64{ele.StateElement.LeafIndex})
 		if err != nil {
-			return types.SiacoinElement{}, fmt.Errorf("failed to fill element proofs: %w", err)
+			return types.BigfileElement{}, fmt.Errorf("failed to fill element proofs: %w", err)
 		} else if len(proof) != 1 {
 			panic("expected exactly one proof") // should never happen
 		}
@@ -33,22 +33,22 @@ WHERE se.id=$1 AND spent_index_id IS NULL`
 	return
 }
 
-func getSiafundElement(tx *txn, id types.SiafundOutputID, indexMode wallet.IndexMode) (ele types.SiafundElement, err error) {
-	const query = `SELECT se.id, se.leaf_index, se.merkle_proof, se.siafund_value, se.claim_start, sa.sia_address 
-FROM siafund_elements se
-INNER JOIN sia_addresses sa ON (se.address_id = sa.id)
+func getBigfundElement(tx *txn, id types.BigfundOutputID, indexMode wallet.IndexMode) (ele types.BigfundElement, err error) {
+	const query = `SELECT se.id, se.leaf_index, se.merkle_proof, se.bigfund_value, se.claim_start, sa.bigfile_address 
+FROM bigfund_elements se
+INNER JOIN bigfile_addresses sa ON (se.address_id = sa.id)
 WHERE se.id=$1 AND spent_index_id IS NULL`
 
-	ele, err = scanSiafundElement(tx.QueryRow(query, encode(id)))
+	ele, err = scanBigfundElement(tx.QueryRow(query, encode(id)))
 	if err != nil {
-		return types.SiafundElement{}, err
+		return types.BigfundElement{}, err
 	}
 
-	// retrieve the merkle proofs for the siafund element
+	// retrieve the merkle proofs for the bigfund element
 	if indexMode == wallet.IndexModeFull {
 		proof, err := fillElementProofs(tx, []uint64{ele.StateElement.LeafIndex})
 		if err != nil {
-			return types.SiafundElement{}, fmt.Errorf("failed to fill element proofs: %w", err)
+			return types.BigfundElement{}, fmt.Errorf("failed to fill element proofs: %w", err)
 		} else if len(proof) != 1 {
 			panic("expected exactly one proof") // should never happen
 		}
@@ -57,10 +57,10 @@ WHERE se.id=$1 AND spent_index_id IS NULL`
 	return
 }
 
-// SiacoinElement returns an unspent Siacoin UTXO by its ID.
-func (s *Store) SiacoinElement(id types.SiacoinOutputID) (ele types.SiacoinElement, err error) {
+// BigfileElement returns an unspent Bigfile UTXO by its ID.
+func (s *Store) BigfileElement(id types.BigfileOutputID) (ele types.BigfileElement, err error) {
 	err = s.transaction(func(tx *txn) error {
-		ele, err = getSiacoinElement(tx, id, s.indexMode)
+		ele, err = getBigfileElement(tx, id, s.indexMode)
 		if errors.Is(err, sql.ErrNoRows) {
 			return wallet.ErrNotFound
 		}
@@ -69,10 +69,10 @@ func (s *Store) SiacoinElement(id types.SiacoinOutputID) (ele types.SiacoinEleme
 	return
 }
 
-// SiafundElement returns an unspent Siafund UTXO by its ID.
-func (s *Store) SiafundElement(id types.SiafundOutputID) (ele types.SiafundElement, err error) {
+// BigfundElement returns an unspent Bigfund UTXO by its ID.
+func (s *Store) BigfundElement(id types.BigfundOutputID) (ele types.BigfundElement, err error) {
 	err = s.transaction(func(tx *txn) error {
-		ele, err = getSiafundElement(tx, id, s.indexMode)
+		ele, err = getBigfundElement(tx, id, s.indexMode)
 		if errors.Is(err, sql.ErrNoRows) {
 			return wallet.ErrNotFound
 		}
@@ -81,10 +81,10 @@ func (s *Store) SiafundElement(id types.SiafundOutputID) (ele types.SiafundEleme
 	return
 }
 
-// SiacoinElementSpentEvent returns the event that spent a Siacoin UTXO.
-func (s *Store) SiacoinElementSpentEvent(id types.SiacoinOutputID) (ev wallet.Event, spent bool, err error) {
+// BigfileElementSpentEvent returns the event that spent a Bigfile UTXO.
+func (s *Store) BigfileElementSpentEvent(id types.BigfileOutputID) (ev wallet.Event, spent bool, err error) {
 	err = s.transaction(func(tx *txn) error {
-		const query = `SELECT spent_event_id FROM siacoin_elements WHERE id=$1`
+		const query = `SELECT spent_event_id FROM bigfile_elements WHERE id=$1`
 
 		var spentEventID sql.NullInt64
 		err = tx.QueryRow(query, encode(id)).Scan(&spentEventID)
@@ -109,10 +109,10 @@ func (s *Store) SiacoinElementSpentEvent(id types.SiacoinOutputID) (ev wallet.Ev
 	return
 }
 
-// SiafundElementSpentEvent returns the event that spent a Siafund UTXO.
-func (s *Store) SiafundElementSpentEvent(id types.SiafundOutputID) (ev wallet.Event, spent bool, err error) {
+// BigfundElementSpentEvent returns the event that spent a Bigfund UTXO.
+func (s *Store) BigfundElementSpentEvent(id types.BigfundOutputID) (ev wallet.Event, spent bool, err error) {
 	err = s.transaction(func(tx *txn) error {
-		const query = `SELECT spent_event_id FROM siafund_elements WHERE id=$1`
+		const query = `SELECT spent_event_id FROM bigfund_elements WHERE id=$1`
 
 		var spentEventID sql.NullInt64
 		err = tx.QueryRow(query, encode(id)).Scan(&spentEventID)

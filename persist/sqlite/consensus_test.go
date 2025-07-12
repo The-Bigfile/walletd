@@ -4,12 +4,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils"
-	"go.sia.tech/coreutils/chain"
-	"go.sia.tech/coreutils/testutil"
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils"
+	"go.thebigfile.com/coreutils/chain"
+	"go.thebigfile.com/coreutils/testutil"
+	"go.thebigfile.com/walletd/v2/wallet"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -18,7 +18,7 @@ func mineBlock(state consensus.State, txns []types.Transaction, minerAddr types.
 		ParentID:     state.Index.ID,
 		Timestamp:    types.CurrentTimestamp(),
 		Transactions: txns,
-		MinerPayouts: []types.SiacoinOutput{{Address: minerAddr, Value: state.BlockReward()}},
+		MinerPayouts: []types.BigfileOutput{{Address: minerAddr, Value: state.BlockReward()}},
 	}
 	for b.ID().CmpWork(state.ChildTarget) < 0 {
 		b.Nonce += state.NonceFactor()
@@ -48,7 +48,7 @@ func syncDB(tb testing.TB, store *Store, cm *chain.Manager) {
 	}
 }
 
-func TestPruneSiacoins(t *testing.T) {
+func TestPruneBigfiles(t *testing.T) {
 	log := zaptest.NewLogger(t)
 	dir := t.TempDir()
 	db, err := OpenDatabase(filepath.Join(dir, "walletd.sqlite3"), WithLog(log.Named("sqlite3")), WithRetainSpentElements(20))
@@ -91,16 +91,16 @@ func TestPruneSiacoins(t *testing.T) {
 	}
 	syncDB(t, db, cm)
 
-	assertBalance := func(siacoin, immature types.Currency) {
+	assertBalance := func(bigfile, immature types.Currency) {
 		t.Helper()
 
 		b, err := db.WalletBalance(w.ID)
 		if err != nil {
 			t.Fatalf("failed to get wallet balance: %v", err)
-		} else if !b.ImmatureSiacoins.Equals(immature) {
-			t.Fatalf("expected immature siacoin balance %v, got %v", immature, b.ImmatureSiacoins)
-		} else if !b.Siacoins.Equals(siacoin) {
-			t.Fatalf("expected siacoin balance %v, got %v", siacoin, b.Siacoins)
+		} else if !b.ImmatureBigfiles.Equals(immature) {
+			t.Fatalf("expected immature bigfile balance %v, got %v", immature, b.ImmatureBigfiles)
+		} else if !b.Bigfiles.Equals(bigfile) {
+			t.Fatalf("expected bigfile balance %v, got %v", bigfile, b.Bigfiles)
 		}
 	}
 
@@ -108,18 +108,18 @@ func TestPruneSiacoins(t *testing.T) {
 		t.Helper()
 
 		var n int
-		err := db.db.QueryRow(`SELECT COUNT(*) FROM siacoin_elements WHERE spent_index_id IS NOT NULL`).Scan(&n)
+		err := db.db.QueryRow(`SELECT COUNT(*) FROM bigfile_elements WHERE spent_index_id IS NOT NULL`).Scan(&n)
 		if err != nil {
-			t.Fatalf("failed to count spent siacoin elements: %v", err)
+			t.Fatalf("failed to count spent bigfile elements: %v", err)
 		} else if n != spent {
-			t.Fatalf("expected %v spent siacoin elements, got %v", spent, n)
+			t.Fatalf("expected %v spent bigfile elements, got %v", spent, n)
 		}
 
-		err = db.db.QueryRow(`SELECT COUNT(*) FROM siacoin_elements WHERE spent_index_id IS NULL`).Scan(&n)
+		err = db.db.QueryRow(`SELECT COUNT(*) FROM bigfile_elements WHERE spent_index_id IS NULL`).Scan(&n)
 		if err != nil {
-			t.Fatalf("failed to count unspent siacoin elements: %v", err)
+			t.Fatalf("failed to count unspent bigfile elements: %v", err)
 		} else if n != unspent {
-			t.Fatalf("expected %v unspent siacoin elements, got %v", unspent, n)
+			t.Fatalf("expected %v unspent bigfile elements, got %v", unspent, n)
 		}
 	}
 
@@ -137,18 +137,18 @@ func TestPruneSiacoins(t *testing.T) {
 	assertUTXOs(0, 1)
 
 	// spend the utxo
-	utxos, _, err := db.WalletSiacoinOutputs(w.ID, 0, 100)
+	utxos, _, err := db.WalletBigfileOutputs(w.ID, 0, 100)
 	if err != nil {
-		t.Fatalf("failed to get wallet siacoin outputs: %v", err)
+		t.Fatalf("failed to get wallet bigfile outputs: %v", err)
 	}
 
 	txn := types.Transaction{
-		SiacoinInputs: []types.SiacoinInput{{
-			ParentID:         types.SiacoinOutputID(utxos[0].ID),
+		BigfileInputs: []types.BigfileInput{{
+			ParentID:         types.BigfileOutputID(utxos[0].ID),
 			UnlockConditions: types.StandardUnlockConditions(pk.PublicKey()),
 		}},
-		SiacoinOutputs: []types.SiacoinOutput{
-			{Value: utxos[0].SiacoinOutput.Value, Address: types.VoidAddress},
+		BigfileOutputs: []types.BigfileOutput{
+			{Value: utxos[0].BigfileOutput.Value, Address: types.VoidAddress},
 		},
 	}
 
@@ -189,7 +189,7 @@ func TestPruneSiacoins(t *testing.T) {
 	assertUTXOs(0, 0)
 }
 
-func TestPruneSiafunds(t *testing.T) {
+func TestPruneBigfunds(t *testing.T) {
 	log := zaptest.NewLogger(t)
 	dir := t.TempDir()
 	db, err := OpenDatabase(filepath.Join(dir, "walletd.sqlite3"), WithLog(log.Named("sqlite3")))
@@ -209,8 +209,8 @@ func TestPruneSiafunds(t *testing.T) {
 	addr := types.StandardUnlockHash(pk.PublicKey())
 
 	network, genesisBlock := testutil.Network()
-	// send the siafund airdrop to the wallet
-	genesisBlock.Transactions[0].SiafundOutputs[0].Address = addr
+	// send the bigfund airdrop to the wallet
+	genesisBlock.Transactions[0].BigfundOutputs[0].Address = addr
 	store, genesisState, err := chain.NewDBStore(bdb, network, genesisBlock, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -228,14 +228,14 @@ func TestPruneSiafunds(t *testing.T) {
 
 	syncDB(t, db, cm)
 
-	assertBalance := func(siafunds uint64) {
+	assertBalance := func(bigfunds uint64) {
 		t.Helper()
 
 		b, err := db.WalletBalance(w.ID)
 		if err != nil {
 			t.Fatalf("failed to get wallet balance: %v", err)
-		} else if b.Siafunds != siafunds {
-			t.Fatalf("expected siafund balance %v, got %v", siafunds, b.ImmatureSiacoins)
+		} else if b.Bigfunds != bigfunds {
+			t.Fatalf("expected bigfund balance %v, got %v", bigfunds, b.ImmatureBigfiles)
 		}
 	}
 
@@ -243,37 +243,37 @@ func TestPruneSiafunds(t *testing.T) {
 		t.Helper()
 
 		var n int
-		err := db.db.QueryRow(`SELECT COUNT(*) FROM siafund_elements WHERE spent_index_id IS NOT NULL`).Scan(&n)
+		err := db.db.QueryRow(`SELECT COUNT(*) FROM bigfund_elements WHERE spent_index_id IS NOT NULL`).Scan(&n)
 		if err != nil {
-			t.Fatalf("failed to count spent siacoin elements: %v", err)
+			t.Fatalf("failed to count spent bigfile elements: %v", err)
 		} else if n != spent {
-			t.Fatalf("expected %v spent siacoin elements, got %v", spent, n)
+			t.Fatalf("expected %v spent bigfile elements, got %v", spent, n)
 		}
 
-		err = db.db.QueryRow(`SELECT COUNT(*) FROM siafund_elements WHERE spent_index_id IS NULL`).Scan(&n)
+		err = db.db.QueryRow(`SELECT COUNT(*) FROM bigfund_elements WHERE spent_index_id IS NULL`).Scan(&n)
 		if err != nil {
-			t.Fatalf("failed to count unspent siacoin elements: %v", err)
+			t.Fatalf("failed to count unspent bigfile elements: %v", err)
 		} else if n != unspent {
-			t.Fatalf("expected %v unspent siacoin elements, got %v", unspent, n)
+			t.Fatalf("expected %v unspent bigfile elements, got %v", unspent, n)
 		}
 	}
 
-	assertBalance(cm.TipState().SiafundCount())
+	assertBalance(cm.TipState().BigfundCount())
 	assertUTXOs(0, 1)
 
 	// spend the utxo
-	utxos, _, err := db.WalletSiafundOutputs(w.ID, 0, 100)
+	utxos, _, err := db.WalletBigfundOutputs(w.ID, 0, 100)
 	if err != nil {
-		t.Fatalf("failed to get wallet siacoin outputs: %v", err)
+		t.Fatalf("failed to get wallet bigfile outputs: %v", err)
 	}
 
 	txn := types.Transaction{
-		SiafundInputs: []types.SiafundInput{{
-			ParentID:         types.SiafundOutputID(utxos[0].ID),
+		BigfundInputs: []types.BigfundInput{{
+			ParentID:         types.BigfundOutputID(utxos[0].ID),
 			UnlockConditions: types.StandardUnlockConditions(pk.PublicKey()),
 		}},
-		SiafundOutputs: []types.SiafundOutput{
-			{Value: utxos[0].SiafundOutput.Value, Address: types.VoidAddress},
+		BigfundOutputs: []types.BigfundOutput{
+			{Value: utxos[0].BigfundOutput.Value, Address: types.VoidAddress},
 		},
 	}
 

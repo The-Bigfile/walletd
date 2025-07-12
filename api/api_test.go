@@ -13,13 +13,13 @@ import (
 	"testing"
 	"time"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils"
-	"go.sia.tech/jape"
-	"go.sia.tech/walletd/v2/api"
-	"go.sia.tech/walletd/v2/internal/testutil"
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils"
+	"go.thebigfile.com/jape"
+	"go.thebigfile.com/walletd/v2/api"
+	"go.thebigfile.com/walletd/v2/internal/testutil"
+	"go.thebigfile.com/walletd/v2/wallet"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	"lukechampine.com/frand"
@@ -57,8 +57,8 @@ func TestWalletAdd(t *testing.T) {
 	n, genesisBlock := testutil.V1Network()
 	giftPrivateKey := types.GeneratePrivateKey()
 	giftAddress := types.StandardUnlockHash(giftPrivateKey.PublicKey())
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(1),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(1),
 		Address: giftAddress,
 	}
 	cn := testutil.NewConsensusNode(t, n, genesisBlock, log)
@@ -212,8 +212,8 @@ func TestWallet(t *testing.T) {
 	n, genesisBlock := testutil.V1Network()
 	giftPrivateKey := types.GeneratePrivateKey()
 	giftAddress := types.StandardUnlockHash(giftPrivateKey.PublicKey())
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(1),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(1),
 		Address: giftAddress,
 	}
 	cn := testutil.NewConsensusNode(t, n, genesisBlock, log)
@@ -234,7 +234,7 @@ func TestWallet(t *testing.T) {
 	balance, err := wc.Balance()
 	if err != nil {
 		t.Fatal(err)
-	} else if !balance.Siacoins.IsZero() || !balance.ImmatureSiacoins.IsZero() || balance.Siafunds != 0 {
+	} else if !balance.Bigfiles.IsZero() || !balance.ImmatureBigfiles.IsZero() || balance.Bigfunds != 0 {
 		t.Fatal("balance should be 0")
 	}
 
@@ -275,15 +275,15 @@ func TestWallet(t *testing.T) {
 	}
 
 	// send gift to wallet
-	giftSCOID := genesisBlock.Transactions[0].SiacoinOutputID(0)
+	giftSCOID := genesisBlock.Transactions[0].BigfileOutputID(0)
 	txn := types.Transaction{
-		SiacoinInputs: []types.SiacoinInput{{
+		BigfileInputs: []types.BigfileInput{{
 			ParentID:         giftSCOID,
 			UnlockConditions: types.StandardUnlockConditions(giftPrivateKey.PublicKey()),
 		}},
-		SiacoinOutputs: []types.SiacoinOutput{
-			{Address: addr, Value: types.Siacoins(1).Div64(2)},
-			{Address: addr, Value: types.Siacoins(1).Div64(2)},
+		BigfileOutputs: []types.BigfileOutput{
+			{Address: addr, Value: types.Bigfiles(1).Div64(2)},
+			{Address: addr, Value: types.Bigfiles(1).Div64(2)},
 		},
 		Signatures: []types.TransactionSignature{{
 			ParentID:      types.Hash256(giftSCOID),
@@ -325,10 +325,10 @@ func TestWallet(t *testing.T) {
 	balance, err = wc.Balance()
 	if err != nil {
 		t.Fatal(err)
-	} else if !balance.Siacoins.Equals(types.Siacoins(1)) {
-		t.Fatal("balance should be 1 SC, got", balance.Siacoins)
-	} else if !balance.ImmatureSiacoins.IsZero() {
-		t.Fatal("immature balance should be 0 SC, got", balance.ImmatureSiacoins)
+	} else if !balance.Bigfiles.Equals(types.Bigfiles(1)) {
+		t.Fatal("balance should be 1 BIG, got", balance.Bigfiles)
+	} else if !balance.ImmatureBigfiles.IsZero() {
+		t.Fatal("immature balance should be 0 BIG, got", balance.ImmatureBigfiles)
 	}
 
 	// transaction should appear in history
@@ -339,7 +339,7 @@ func TestWallet(t *testing.T) {
 		t.Fatal("transaction should appear in history")
 	}
 
-	outputs, basis, err := wc.SiacoinOutputs(0, 100)
+	outputs, basis, err := wc.BigfileOutputs(0, 100)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(outputs) != 2 {
@@ -358,24 +358,24 @@ func TestWallet(t *testing.T) {
 	balance, err = wc.Balance()
 	if err != nil {
 		t.Fatal(err)
-	} else if !balance.Siacoins.Equals(types.Siacoins(1)) {
-		t.Fatal("balance should be 1 SC, got", balance.Siacoins)
-	} else if !balance.ImmatureSiacoins.Equals(expectedPayout) {
-		t.Fatalf("immature balance should be %d SC, got %d SC", expectedPayout, balance.ImmatureSiacoins)
+	} else if !balance.Bigfiles.Equals(types.Bigfiles(1)) {
+		t.Fatal("balance should be 1 BIG, got", balance.Bigfiles)
+	} else if !balance.ImmatureBigfiles.Equals(expectedPayout) {
+		t.Fatalf("immature balance should be %d BIG, got %d BIG", expectedPayout, balance.ImmatureBigfiles)
 	}
 
 	// mine enough blocks for the miner payout to mature
-	expectedBalance := types.Siacoins(1).Add(expectedPayout)
+	expectedBalance := types.Bigfiles(1).Add(expectedPayout)
 	cn.MineBlocks(t, types.VoidAddress, int(n.MaturityDelay))
 
 	// get new balance
 	balance, err = wc.Balance()
 	if err != nil {
 		t.Fatal(err)
-	} else if !balance.Siacoins.Equals(expectedBalance) {
-		t.Fatalf("balance should be %d, got %d", expectedBalance, balance.Siacoins)
-	} else if !balance.ImmatureSiacoins.IsZero() {
-		t.Fatal("immature balance should be 0 SC, got", balance.ImmatureSiacoins)
+	} else if !balance.Bigfiles.Equals(expectedBalance) {
+		t.Fatalf("balance should be %d, got %d", expectedBalance, balance.Bigfiles)
+	} else if !balance.ImmatureBigfiles.IsZero() {
+		t.Fatal("immature balance should be 0 BIG, got", balance.ImmatureBigfiles)
 	}
 }
 
@@ -385,8 +385,8 @@ func TestAddresses(t *testing.T) {
 	n, genesisBlock := testutil.V1Network()
 	giftPrivateKey := types.GeneratePrivateKey()
 	giftAddress := types.StandardUnlockHash(giftPrivateKey.PublicKey())
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(1),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(1),
 		Address: giftAddress,
 	}
 
@@ -408,15 +408,15 @@ func TestAddresses(t *testing.T) {
 	}
 
 	// send gift to wallet
-	giftSCOID := genesisBlock.Transactions[0].SiacoinOutputID(0)
+	giftSCOID := genesisBlock.Transactions[0].BigfileOutputID(0)
 	txn := types.Transaction{
-		SiacoinInputs: []types.SiacoinInput{{
+		BigfileInputs: []types.BigfileInput{{
 			ParentID:         giftSCOID,
 			UnlockConditions: types.StandardUnlockConditions(giftPrivateKey.PublicKey()),
 		}},
-		SiacoinOutputs: []types.SiacoinOutput{
-			{Address: addr, Value: types.Siacoins(1).Div64(2)},
-			{Address: addr, Value: types.Siacoins(1).Div64(2)},
+		BigfileOutputs: []types.BigfileOutput{
+			{Address: addr, Value: types.Bigfiles(1).Div64(2)},
+			{Address: addr, Value: types.Bigfiles(1).Div64(2)},
 		},
 		Signatures: []types.TransactionSignature{{
 			ParentID:      types.Hash256(giftSCOID),
@@ -442,10 +442,10 @@ func TestAddresses(t *testing.T) {
 	balance, err := c.AddressBalance(addr)
 	if err != nil {
 		t.Fatal(err)
-	} else if !balance.Siacoins.Equals(types.Siacoins(1)) {
-		t.Fatal("balance should be 1 SC, got", balance.Siacoins)
-	} else if !balance.ImmatureSiacoins.IsZero() {
-		t.Fatal("immature balance should be 0 SC, got", balance.ImmatureSiacoins)
+	} else if !balance.Bigfiles.Equals(types.Bigfiles(1)) {
+		t.Fatal("balance should be 1 BIG, got", balance.Bigfiles)
+	} else if !balance.ImmatureBigfiles.IsZero() {
+		t.Fatal("immature balance should be 0 BIG, got", balance.ImmatureBigfiles)
 	}
 
 	// transaction should appear in history
@@ -456,7 +456,7 @@ func TestAddresses(t *testing.T) {
 		t.Fatal("transaction should appear in history")
 	}
 
-	outputs, basis, err := c.AddressSiacoinOutputs(addr, false, 0, 100)
+	outputs, basis, err := c.AddressBigfileOutputs(addr, false, 0, 100)
 	if err != nil {
 		t.Fatal(err)
 	} else if len(outputs) != 2 {
@@ -473,24 +473,24 @@ func TestAddresses(t *testing.T) {
 	balance, err = c.AddressBalance(addr)
 	if err != nil {
 		t.Fatal(err)
-	} else if !balance.Siacoins.Equals(types.Siacoins(1)) {
-		t.Fatal("balance should be 1 SC, got", balance.Siacoins)
-	} else if !balance.ImmatureSiacoins.Equals(expectedPayout) {
-		t.Fatalf("immature balance should be %d SC, got %d SC", expectedPayout, balance.ImmatureSiacoins)
+	} else if !balance.Bigfiles.Equals(types.Bigfiles(1)) {
+		t.Fatal("balance should be 1 BIG, got", balance.Bigfiles)
+	} else if !balance.ImmatureBigfiles.Equals(expectedPayout) {
+		t.Fatalf("immature balance should be %d BIG, got %d BIG", expectedPayout, balance.ImmatureBigfiles)
 	}
 
 	// mine enough blocks for the miner payout to mature
-	expectedBalance := types.Siacoins(1).Add(expectedPayout)
+	expectedBalance := types.Bigfiles(1).Add(expectedPayout)
 	cn.MineBlocks(t, types.VoidAddress, int(n.MaturityDelay))
 
 	// get new balance
 	balance, err = c.AddressBalance(addr)
 	if err != nil {
 		t.Fatal(err)
-	} else if !balance.Siacoins.Equals(expectedBalance) {
-		t.Fatalf("balance should be %d, got %d", expectedBalance, balance.Siacoins)
-	} else if !balance.ImmatureSiacoins.IsZero() {
-		t.Fatal("immature balance should be 0 SC, got", balance.ImmatureSiacoins)
+	} else if !balance.Bigfiles.Equals(expectedBalance) {
+		t.Fatalf("balance should be %d, got %d", expectedBalance, balance.Bigfiles)
+	} else if !balance.ImmatureBigfiles.IsZero() {
+		t.Fatal("immature balance should be 0 BIG, got", balance.ImmatureBigfiles)
 	}
 
 	// create new wallet
@@ -522,8 +522,8 @@ func TestConsensus(t *testing.T) {
 	n, genesisBlock := testutil.V2Network()
 	giftPrivateKey := types.GeneratePrivateKey()
 	giftAddress := types.StandardUnlockHash(giftPrivateKey.PublicKey())
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(1),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(1),
 		Address: giftAddress,
 	}
 
@@ -561,8 +561,8 @@ func TestConsensusCheckpoint(t *testing.T) {
 	n, genesisBlock := testutil.V2Network()
 	giftPrivateKey := types.GeneratePrivateKey()
 	giftAddress := types.StandardUnlockHash(giftPrivateKey.PublicKey())
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(1),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(1),
 		Address: giftAddress,
 	}
 
@@ -611,8 +611,8 @@ func TestConsensusUpdates(t *testing.T) {
 	n, genesisBlock := testutil.V1Network()
 	giftPrivateKey := types.GeneratePrivateKey()
 	giftAddress := types.StandardUnlockHash(giftPrivateKey.PublicKey())
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(1),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(1),
 		Address: giftAddress,
 	}
 
@@ -642,7 +642,7 @@ func TestConsensusUpdates(t *testing.T) {
 	}
 }
 
-func TestConstructSiacoins(t *testing.T) {
+func TestConstructBigfiles(t *testing.T) {
 	log := zaptest.NewLogger(t)
 
 	n, genesisBlock := testutil.V1Network()
@@ -654,8 +654,8 @@ func TestConstructSiacoins(t *testing.T) {
 	receiverPolicy := types.SpendPolicy{Type: types.PolicyTypeUnlockConditions(types.StandardUnlockConditions(receiverPrivateKey.PublicKey()))}
 	receiverAddr := receiverPolicy.Address()
 
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(100),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(100),
 		Address: senderAddr,
 	}
 
@@ -684,8 +684,8 @@ func TestConstructSiacoins(t *testing.T) {
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
 	// try to construct a valid transaction with no spend policy
-	_, err = wc.Construct([]types.SiacoinOutput{
-		{Value: types.Siacoins(1), Address: receiverAddr},
+	_, err = wc.Construct([]types.BigfileOutput{
+		{Value: types.Bigfiles(1), Address: receiverAddr},
 	}, nil, senderAddr)
 	if !strings.Contains(err.Error(), "no spend policy") {
 		t.Fatalf("expected error to contain %q, got %q", "no spend policy", err)
@@ -702,35 +702,35 @@ func TestConstructSiacoins(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// try to construct a transaction with more siafunds than the wallet holds.
-	// this will lock all of the wallet's siacoins
-	resp, err := wc.Construct([]types.SiacoinOutput{
-		{Value: types.Siacoins(1), Address: receiverAddr},
-	}, []types.SiafundOutput{
+	// try to construct a transaction with more bigfunds than the wallet holds.
+	// this will lock all of the wallet's bigfiles
+	resp, err := wc.Construct([]types.BigfileOutput{
+		{Value: types.Bigfiles(1), Address: receiverAddr},
+	}, []types.BigfundOutput{
 		{Value: 100000, Address: senderAddr},
 	}, senderAddr)
 	if !strings.Contains(err.Error(), "insufficient funds") {
 		t.Fatal(err)
 	}
 
-	// construct a transaction with a single siacoin output
+	// construct a transaction with a single bigfile output
 	// this will fail if the utxos were not unlocked
-	resp, err = wc.Construct([]types.SiacoinOutput{
-		{Value: types.Siacoins(1), Address: receiverAddr},
+	resp, err = wc.Construct([]types.BigfileOutput{
+		{Value: types.Bigfiles(1), Address: receiverAddr},
 	}, nil, senderAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	switch {
-	case resp.Transaction.SiacoinOutputs[0].Address != receiverAddr:
-		t.Fatalf("expected transaction to have output address %q, got %q", receiverAddr, resp.Transaction.SiacoinOutputs[0].Address)
-	case !resp.Transaction.SiacoinOutputs[0].Value.Equals(types.Siacoins(1)):
-		t.Fatalf("expected transaction to have output value of %v, got %v", types.Siacoins(1), resp.Transaction.SiacoinOutputs[0].Value)
-	case resp.Transaction.SiacoinOutputs[1].Address != senderAddr:
-		t.Fatalf("expected transaction to have change address %q, got %q", senderAddr, resp.Transaction.SiacoinOutputs[1].Address)
-	case !resp.Transaction.SiacoinOutputs[1].Value.Equals(types.Siacoins(99).Sub(resp.EstimatedFee)):
-		t.Fatalf("expected transaction to have change value of %v, got %v", types.Siacoins(99).Sub(resp.EstimatedFee), resp.Transaction.SiacoinOutputs[1].Value)
+	case resp.Transaction.BigfileOutputs[0].Address != receiverAddr:
+		t.Fatalf("expected transaction to have output address %q, got %q", receiverAddr, resp.Transaction.BigfileOutputs[0].Address)
+	case !resp.Transaction.BigfileOutputs[0].Value.Equals(types.Bigfiles(1)):
+		t.Fatalf("expected transaction to have output value of %v, got %v", types.Bigfiles(1), resp.Transaction.BigfileOutputs[0].Value)
+	case resp.Transaction.BigfileOutputs[1].Address != senderAddr:
+		t.Fatalf("expected transaction to have change address %q, got %q", senderAddr, resp.Transaction.BigfileOutputs[1].Address)
+	case !resp.Transaction.BigfileOutputs[1].Value.Equals(types.Bigfiles(99).Sub(resp.EstimatedFee)):
+		t.Fatalf("expected transaction to have change value of %v, got %v", types.Bigfiles(99).Sub(resp.EstimatedFee), resp.Transaction.BigfileOutputs[1].Value)
 	}
 
 	cs, err := c.ConsensusTipState()
@@ -759,15 +759,15 @@ func TestConstructSiacoins(t *testing.T) {
 	} else if len(unconfirmed) != 1 {
 		t.Fatalf("expected 1 unconfirmed event, got %v", len(unconfirmed))
 	}
-	expectedValue := types.Siacoins(1).Add(resp.EstimatedFee)
+	expectedValue := types.Bigfiles(1).Add(resp.EstimatedFee)
 	sent := unconfirmed[0]
 	switch {
 	case types.TransactionID(sent.ID) != resp.ID:
 		t.Fatalf("expected unconfirmed event to have transaction ID %q, got %q", resp.ID, sent.ID)
 	case sent.Type != wallet.EventTypeV1Transaction:
 		t.Fatalf("expected unconfirmed event to have type %q, got %q", wallet.EventTypeV1Transaction, sent.Type)
-	case !sent.SiacoinOutflow().Sub(sent.SiacoinInflow()).Equals(expectedValue):
-		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", expectedValue, sent.SiacoinOutflow().Sub(sent.SiacoinInflow()))
+	case !sent.BigfileOutflow().Sub(sent.BigfileInflow()).Equals(expectedValue):
+		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", expectedValue, sent.BigfileOutflow().Sub(sent.BigfileInflow()))
 	}
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
@@ -783,12 +783,12 @@ func TestConstructSiacoins(t *testing.T) {
 		t.Fatalf("expected confirmed event to have transaction ID %q, got %q", resp.ID, sent.ID)
 	case sent.Type != wallet.EventTypeV1Transaction:
 		t.Fatalf("expected confirmed event to have type %q, got %q", wallet.EventTypeV1Transaction, sent.Type)
-	case !sent.SiacoinOutflow().Sub(sent.SiacoinInflow()).Equals(expectedValue):
-		t.Fatalf("expected confirmed event to have outflow of %v, got %v", expectedValue, sent.SiacoinOutflow().Sub(sent.SiacoinInflow()))
+	case !sent.BigfileOutflow().Sub(sent.BigfileInflow()).Equals(expectedValue):
+		t.Fatalf("expected confirmed event to have outflow of %v, got %v", expectedValue, sent.BigfileOutflow().Sub(sent.BigfileInflow()))
 	}
 }
 
-func TestConstructSiafunds(t *testing.T) {
+func TestConstructBigfunds(t *testing.T) {
 	log := zaptest.NewLogger(t)
 
 	n, genesisBlock := testutil.V1Network()
@@ -800,11 +800,11 @@ func TestConstructSiafunds(t *testing.T) {
 	receiverPolicy := types.SpendPolicy{Type: types.PolicyTypeUnlockConditions(types.StandardUnlockConditions(receiverPrivateKey.PublicKey()))}
 	receiverAddr := receiverPolicy.Address()
 
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(100),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(100),
 		Address: senderAddr,
 	}
-	genesisBlock.Transactions[0].SiafundOutputs[0].Address = senderAddr
+	genesisBlock.Transactions[0].BigfundOutputs[0].Address = senderAddr
 
 	cn := testutil.NewConsensusNode(t, n, genesisBlock, log)
 	c := startWalletServer(t, cn, log)
@@ -830,7 +830,7 @@ func TestConstructSiafunds(t *testing.T) {
 	}
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
-	resp, err := wc.Construct(nil, []types.SiafundOutput{
+	resp, err := wc.Construct(nil, []types.BigfundOutput{
 		{Value: 1, Address: receiverAddr},
 	}, senderAddr)
 	if err != nil {
@@ -838,20 +838,20 @@ func TestConstructSiafunds(t *testing.T) {
 	}
 
 	switch {
-	case resp.Transaction.SiacoinOutputs[0].Address != senderAddr:
-		t.Fatalf("expected transaction to have change address %q, got %q", senderAddr, resp.Transaction.SiacoinOutputs[0].Address)
-	case !resp.Transaction.SiacoinOutputs[0].Value.Equals(types.Siacoins(100).Sub(resp.EstimatedFee)):
-		t.Fatalf("expected transaction to have change value of %v, got %v", types.Siacoins(99).Sub(resp.EstimatedFee), resp.Transaction.SiacoinOutputs[0].Value)
-	case resp.Transaction.SiafundOutputs[0].Address != receiverAddr:
-		t.Fatalf("expected transaction to have output address %q, got %q", receiverAddr, resp.Transaction.SiafundOutputs[0].Address)
-	case resp.Transaction.SiafundOutputs[0].Value != 1:
-		t.Fatalf("expected transaction to have output value of %v, got %v", types.Siacoins(1), resp.Transaction.SiafundOutputs[0].Value)
-	case resp.Transaction.SiafundOutputs[1].Address != senderAddr:
-		t.Fatalf("expected transaction to have change address %q, got %q", senderAddr, resp.Transaction.SiafundOutputs[1].Address)
-	case resp.Transaction.SiafundOutputs[1].Value != 9999:
-		t.Fatalf("expected transaction to have change value of %v, got %v", types.Siacoins(99).Sub(resp.EstimatedFee), resp.Transaction.SiafundOutputs[1].Value)
-	case resp.Transaction.SiafundInputs[0].ClaimAddress != senderAddr:
-		t.Fatalf("expected transaction to have siafund input claim address %q, got %q", senderAddr, resp.Transaction.SiafundInputs[0].ClaimAddress)
+	case resp.Transaction.BigfileOutputs[0].Address != senderAddr:
+		t.Fatalf("expected transaction to have change address %q, got %q", senderAddr, resp.Transaction.BigfileOutputs[0].Address)
+	case !resp.Transaction.BigfileOutputs[0].Value.Equals(types.Bigfiles(100).Sub(resp.EstimatedFee)):
+		t.Fatalf("expected transaction to have change value of %v, got %v", types.Bigfiles(99).Sub(resp.EstimatedFee), resp.Transaction.BigfileOutputs[0].Value)
+	case resp.Transaction.BigfundOutputs[0].Address != receiverAddr:
+		t.Fatalf("expected transaction to have output address %q, got %q", receiverAddr, resp.Transaction.BigfundOutputs[0].Address)
+	case resp.Transaction.BigfundOutputs[0].Value != 1:
+		t.Fatalf("expected transaction to have output value of %v, got %v", types.Bigfiles(1), resp.Transaction.BigfundOutputs[0].Value)
+	case resp.Transaction.BigfundOutputs[1].Address != senderAddr:
+		t.Fatalf("expected transaction to have change address %q, got %q", senderAddr, resp.Transaction.BigfundOutputs[1].Address)
+	case resp.Transaction.BigfundOutputs[1].Value != 9999:
+		t.Fatalf("expected transaction to have change value of %v, got %v", types.Bigfiles(99).Sub(resp.EstimatedFee), resp.Transaction.BigfundOutputs[1].Value)
+	case resp.Transaction.BigfundInputs[0].ClaimAddress != senderAddr:
+		t.Fatalf("expected transaction to have bigfund input claim address %q, got %q", senderAddr, resp.Transaction.BigfundInputs[0].ClaimAddress)
 	}
 
 	cs, err := c.ConsensusTipState()
@@ -882,10 +882,10 @@ func TestConstructSiafunds(t *testing.T) {
 		t.Fatalf("expected unconfirmed event to have transaction ID %q, got %q", resp.ID, sent.ID)
 	case sent.Type != wallet.EventTypeV1Transaction:
 		t.Fatalf("expected unconfirmed event to have type %q, got %q", wallet.EventTypeV1Transaction, sent.Type)
-	case !sent.SiacoinOutflow().Sub(sent.SiacoinInflow()).Equals(resp.EstimatedFee):
-		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", resp.EstimatedFee, sent.SiacoinOutflow().Sub(sent.SiacoinInflow()))
-	case sent.SiafundOutflow()-sent.SiafundInflow() != 1:
-		t.Fatalf("expected unconfirmed event to have siafund outflow of 1, got %v", sent.SiafundOutflow()-sent.SiafundInflow())
+	case !sent.BigfileOutflow().Sub(sent.BigfileInflow()).Equals(resp.EstimatedFee):
+		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", resp.EstimatedFee, sent.BigfileOutflow().Sub(sent.BigfileInflow()))
+	case sent.BigfundOutflow()-sent.BigfundInflow() != 1:
+		t.Fatalf("expected unconfirmed event to have bigfund outflow of 1, got %v", sent.BigfundOutflow()-sent.BigfundInflow())
 	}
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
@@ -901,14 +901,14 @@ func TestConstructSiafunds(t *testing.T) {
 		t.Fatalf("expected unconfirmed event to have transaction ID %q, got %q", resp.ID, sent.ID)
 	case sent.Type != wallet.EventTypeV1Transaction:
 		t.Fatalf("expected unconfirmed event to have type %q, got %q", wallet.EventTypeV1Transaction, sent.Type)
-	case !sent.SiacoinOutflow().Sub(sent.SiacoinInflow()).Equals(resp.EstimatedFee):
-		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", resp.EstimatedFee, sent.SiacoinOutflow().Sub(sent.SiacoinInflow()))
-	case sent.SiafundOutflow()-sent.SiafundInflow() != 1:
-		t.Fatalf("expected unconfirmed event to have siafund outflow of 1, got %v", sent.SiafundOutflow()-sent.SiafundInflow())
+	case !sent.BigfileOutflow().Sub(sent.BigfileInflow()).Equals(resp.EstimatedFee):
+		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", resp.EstimatedFee, sent.BigfileOutflow().Sub(sent.BigfileInflow()))
+	case sent.BigfundOutflow()-sent.BigfundInflow() != 1:
+		t.Fatalf("expected unconfirmed event to have bigfund outflow of 1, got %v", sent.BigfundOutflow()-sent.BigfundInflow())
 	}
 }
 
-func TestConstructV2Siacoins(t *testing.T) {
+func TestConstructV2Bigfiles(t *testing.T) {
 	log := zaptest.NewLogger(t)
 
 	n, genesisBlock := testutil.V2Network()
@@ -920,8 +920,8 @@ func TestConstructV2Siacoins(t *testing.T) {
 	receiverPolicy := types.SpendPolicy{Type: types.PolicyTypeUnlockConditions(types.StandardUnlockConditions(receiverPrivateKey.PublicKey()))}
 	receiverAddr := receiverPolicy.Address()
 
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(100),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(100),
 		Address: senderAddr,
 	}
 
@@ -950,8 +950,8 @@ func TestConstructV2Siacoins(t *testing.T) {
 	cm.MineBlocks(t, types.VoidAddress, 1)
 
 	// try to construct a transaction
-	resp, err := wc.ConstructV2([]types.SiacoinOutput{
-		{Value: types.Siacoins(1), Address: receiverAddr},
+	resp, err := wc.ConstructV2([]types.BigfileOutput{
+		{Value: types.Bigfiles(1), Address: receiverAddr},
 	}, nil, senderAddr)
 	if !strings.Contains(err.Error(), "no spend policy") {
 		t.Fatalf("expected spend policy error, got %q", err)
@@ -966,11 +966,11 @@ func TestConstructV2Siacoins(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// try to construct a transaction with more siafunds than the wallet holds.
-	// this will lock all of the wallet's Siacoin UTXOs
-	resp, err = wc.ConstructV2([]types.SiacoinOutput{
-		{Value: types.Siacoins(1), Address: receiverAddr},
-	}, []types.SiafundOutput{
+	// try to construct a transaction with more bigfunds than the wallet holds.
+	// this will lock all of the wallet's Bigfile UTXOs
+	resp, err = wc.ConstructV2([]types.BigfileOutput{
+		{Value: types.Bigfiles(1), Address: receiverAddr},
+	}, []types.BigfundOutput{
 		{Value: 100000, Address: senderAddr},
 	}, senderAddr)
 	if !strings.Contains(err.Error(), "insufficient funds") {
@@ -979,8 +979,8 @@ func TestConstructV2Siacoins(t *testing.T) {
 
 	// this will fail if the utxos were not properly
 	// unlocked when the previous request failed
-	resp, err = wc.ConstructV2([]types.SiacoinOutput{
-		{Value: types.Siacoins(1), Address: receiverAddr},
+	resp, err = wc.ConstructV2([]types.BigfileOutput{
+		{Value: types.Bigfiles(1), Address: receiverAddr},
 	}, nil, senderAddr)
 	if err != nil {
 		t.Fatal(err)
@@ -992,21 +992,21 @@ func TestConstructV2Siacoins(t *testing.T) {
 	}
 
 	switch {
-	case resp.Transaction.SiacoinOutputs[0].Address != receiverAddr:
-		t.Fatalf("expected transaction to have output address %q, got %q", receiverAddr, resp.Transaction.SiacoinOutputs[0].Address)
-	case !resp.Transaction.SiacoinOutputs[0].Value.Equals(types.Siacoins(1)):
-		t.Fatalf("expected transaction to have output value of %v, got %v", types.Siacoins(1), resp.Transaction.SiacoinOutputs[0].Value)
-	case resp.Transaction.SiacoinOutputs[1].Address != senderAddr:
-		t.Fatalf("expected transaction to have change address %q, got %q", senderAddr, resp.Transaction.SiacoinOutputs[1].Address)
-	case !resp.Transaction.SiacoinOutputs[1].Value.Equals(types.Siacoins(99).Sub(resp.EstimatedFee)):
-		t.Fatalf("expected transaction to have change value of %v, got %v", types.Siacoins(99).Sub(resp.EstimatedFee), resp.Transaction.SiacoinOutputs[1].Value)
+	case resp.Transaction.BigfileOutputs[0].Address != receiverAddr:
+		t.Fatalf("expected transaction to have output address %q, got %q", receiverAddr, resp.Transaction.BigfileOutputs[0].Address)
+	case !resp.Transaction.BigfileOutputs[0].Value.Equals(types.Bigfiles(1)):
+		t.Fatalf("expected transaction to have output value of %v, got %v", types.Bigfiles(1), resp.Transaction.BigfileOutputs[0].Value)
+	case resp.Transaction.BigfileOutputs[1].Address != senderAddr:
+		t.Fatalf("expected transaction to have change address %q, got %q", senderAddr, resp.Transaction.BigfileOutputs[1].Address)
+	case !resp.Transaction.BigfileOutputs[1].Value.Equals(types.Bigfiles(99).Sub(resp.EstimatedFee)):
+		t.Fatalf("expected transaction to have change value of %v, got %v", types.Bigfiles(99).Sub(resp.EstimatedFee), resp.Transaction.BigfileOutputs[1].Value)
 	}
 
 	// sign the transaction
 	sigHash := cs.InputSigHash(resp.Transaction)
-	for i := range resp.Transaction.SiacoinInputs {
+	for i := range resp.Transaction.BigfileInputs {
 		sig := senderPrivateKey.SignHash(sigHash)
-		resp.Transaction.SiacoinInputs[i].SatisfiedPolicy.Signatures = []types.Signature{sig}
+		resp.Transaction.BigfileInputs[i].SatisfiedPolicy.Signatures = []types.Signature{sig}
 	}
 
 	if broadcastResp, err := c.TxpoolBroadcast(resp.Basis, nil, []types.V2Transaction{resp.Transaction}); err != nil {
@@ -1023,15 +1023,15 @@ func TestConstructV2Siacoins(t *testing.T) {
 	} else if len(unconfirmed) != 1 {
 		t.Fatalf("expected 1 unconfirmed event, got %v", len(unconfirmed))
 	}
-	expectedValue := types.Siacoins(1).Add(resp.EstimatedFee)
+	expectedValue := types.Bigfiles(1).Add(resp.EstimatedFee)
 	sent := unconfirmed[0]
 	switch {
 	case types.TransactionID(sent.ID) != resp.ID:
 		t.Fatalf("expected unconfirmed event to have transaction ID %q, got %q", resp.ID, sent.ID)
 	case sent.Type != wallet.EventTypeV2Transaction:
 		t.Fatalf("expected unconfirmed event to have type %q, got %q", wallet.EventTypeV2Transaction, sent.Type)
-	case !sent.SiacoinOutflow().Sub(sent.SiacoinInflow()).Equals(expectedValue):
-		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", expectedValue, sent.SiacoinOutflow().Sub(sent.SiacoinInflow()))
+	case !sent.BigfileOutflow().Sub(sent.BigfileInflow()).Equals(expectedValue):
+		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", expectedValue, sent.BigfileOutflow().Sub(sent.BigfileInflow()))
 	}
 
 	unconfirmed, err = c.TPoolEvents()
@@ -1059,12 +1059,12 @@ func TestConstructV2Siacoins(t *testing.T) {
 		t.Fatalf("expected confirmed event to have transaction ID %q, got %q", resp.ID, sent.ID)
 	case sent.Type != wallet.EventTypeV2Transaction:
 		t.Fatalf("expected confirmed event to have type %q, got %q", wallet.EventTypeV2Transaction, sent.Type)
-	case !sent.SiacoinOutflow().Sub(sent.SiacoinInflow()).Equals(expectedValue):
-		t.Fatalf("expected confirmed event to have outflow of %v, got %v", expectedValue, sent.SiacoinOutflow().Sub(sent.SiacoinInflow()))
+	case !sent.BigfileOutflow().Sub(sent.BigfileInflow()).Equals(expectedValue):
+		t.Fatalf("expected confirmed event to have outflow of %v, got %v", expectedValue, sent.BigfileOutflow().Sub(sent.BigfileInflow()))
 	}
 }
 
-func TestConstructV2Siafunds(t *testing.T) {
+func TestConstructV2Bigfunds(t *testing.T) {
 	log := zaptest.NewLogger(t)
 
 	n, genesisBlock := testutil.V2Network()
@@ -1076,11 +1076,11 @@ func TestConstructV2Siafunds(t *testing.T) {
 	receiverPolicy := types.SpendPolicy{Type: types.PolicyTypeUnlockConditions(types.StandardUnlockConditions(receiverPrivateKey.PublicKey()))}
 	receiverAddr := receiverPolicy.Address()
 
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(100),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(100),
 		Address: senderAddr,
 	}
-	genesisBlock.Transactions[0].SiafundOutputs[0].Address = senderAddr
+	genesisBlock.Transactions[0].BigfundOutputs[0].Address = senderAddr
 
 	cn := testutil.NewConsensusNode(t, n, genesisBlock, log)
 	c := startWalletServer(t, cn, log)
@@ -1106,7 +1106,7 @@ func TestConstructV2Siafunds(t *testing.T) {
 	}
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
-	resp, err := wc.ConstructV2(nil, []types.SiafundOutput{
+	resp, err := wc.ConstructV2(nil, []types.BigfundOutput{
 		{Value: 1, Address: receiverAddr},
 	}, senderAddr)
 	if err != nil {
@@ -1121,11 +1121,11 @@ func TestConstructV2Siafunds(t *testing.T) {
 	// sign the transaction
 	sigHash := cs.InputSigHash(resp.Transaction)
 	sig := senderPrivateKey.SignHash(sigHash)
-	for i := range resp.Transaction.SiafundInputs {
-		resp.Transaction.SiafundInputs[i].SatisfiedPolicy.Signatures = []types.Signature{sig}
+	for i := range resp.Transaction.BigfundInputs {
+		resp.Transaction.BigfundInputs[i].SatisfiedPolicy.Signatures = []types.Signature{sig}
 	}
-	for i := range resp.Transaction.SiafundInputs {
-		resp.Transaction.SiacoinInputs[i].SatisfiedPolicy.Signatures = []types.Signature{sig}
+	for i := range resp.Transaction.BigfundInputs {
+		resp.Transaction.BigfileInputs[i].SatisfiedPolicy.Signatures = []types.Signature{sig}
 	}
 
 	if _, err := c.TxpoolBroadcast(resp.Basis, nil, []types.V2Transaction{resp.Transaction}); err != nil {
@@ -1144,10 +1144,10 @@ func TestConstructV2Siafunds(t *testing.T) {
 		t.Fatalf("expected unconfirmed event to have transaction ID %q, got %q", resp.ID, sent.ID)
 	case sent.Type != wallet.EventTypeV2Transaction:
 		t.Fatalf("expected unconfirmed event to have type %q, got %q", wallet.EventTypeV2Transaction, sent.Type)
-	case !sent.SiacoinOutflow().Sub(sent.SiacoinInflow()).Equals(resp.EstimatedFee):
-		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", resp.EstimatedFee, sent.SiacoinOutflow().Sub(sent.SiacoinInflow()))
-	case sent.SiafundOutflow()-sent.SiafundInflow() != 1:
-		t.Fatalf("expected unconfirmed event to have siafund outflow of 1, got %v", sent.SiafundOutflow()-sent.SiafundInflow())
+	case !sent.BigfileOutflow().Sub(sent.BigfileInflow()).Equals(resp.EstimatedFee):
+		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", resp.EstimatedFee, sent.BigfileOutflow().Sub(sent.BigfileInflow()))
+	case sent.BigfundOutflow()-sent.BigfundInflow() != 1:
+		t.Fatalf("expected unconfirmed event to have bigfund outflow of 1, got %v", sent.BigfundOutflow()-sent.BigfundInflow())
 	}
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
@@ -1164,10 +1164,10 @@ func TestConstructV2Siafunds(t *testing.T) {
 		t.Fatalf("expected unconfirmed event to have transaction ID %q, got %q", resp.ID, sent.ID)
 	case sent.Type != wallet.EventTypeV2Transaction:
 		t.Fatalf("expected unconfirmed event to have type %q, got %q", wallet.EventTypeV2Transaction, sent.Type)
-	case !sent.SiacoinOutflow().Sub(sent.SiacoinInflow()).Equals(resp.EstimatedFee):
-		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", resp.EstimatedFee, sent.SiacoinOutflow().Sub(sent.SiacoinInflow()))
-	case sent.SiafundOutflow()-sent.SiafundInflow() != 1:
-		t.Fatalf("expected unconfirmed event to have siafund outflow of 1, got %v", sent.SiafundOutflow()-sent.SiafundInflow())
+	case !sent.BigfileOutflow().Sub(sent.BigfileInflow()).Equals(resp.EstimatedFee):
+		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", resp.EstimatedFee, sent.BigfileOutflow().Sub(sent.BigfileInflow()))
+	case sent.BigfundOutflow()-sent.BigfundInflow() != 1:
+		t.Fatalf("expected unconfirmed event to have bigfund outflow of 1, got %v", sent.BigfundOutflow()-sent.BigfundInflow())
 	}
 }
 
@@ -1183,11 +1183,11 @@ func TestSpentElement(t *testing.T) {
 	receiverPolicy := types.SpendPolicy{Type: types.PolicyTypeUnlockConditions(types.StandardUnlockConditions(receiverPrivateKey.PublicKey()))}
 	receiverAddr := receiverPolicy.Address()
 
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(100),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(100),
 		Address: senderAddr,
 	}
-	genesisBlock.Transactions[0].SiafundOutputs[0].Address = senderAddr
+	genesisBlock.Transactions[0].BigfundOutputs[0].Address = senderAddr
 
 	cn := testutil.NewConsensusNode(t, n, genesisBlock, log)
 	c := startWalletServer(t, cn, log, wallet.WithIndexMode(wallet.IndexModeFull))
@@ -1195,36 +1195,36 @@ func TestSpentElement(t *testing.T) {
 	// trigger initial scan
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
-	sce, basis, err := c.AddressSiacoinOutputs(senderAddr, false, 0, 100)
+	bige, basis, err := c.AddressBigfileOutputs(senderAddr, false, 0, 100)
 	if err != nil {
 		t.Fatal(err)
-	} else if len(sce) != 1 {
-		t.Fatalf("expected 1 siacoin element, got %v", len(sce))
+	} else if len(bige) != 1 {
+		t.Fatalf("expected 1 bigfile element, got %v", len(bige))
 	}
 
 	// check if the element is spent
-	spent, err := c.SpentSiacoinElement(sce[0].ID)
+	spent, err := c.SpentBigfileElement(bige[0].ID)
 	if err != nil {
 		t.Fatal(err)
 	} else if spent.Spent {
-		t.Fatal("expected siacoin element to be unspent")
+		t.Fatal("expected bigfile element to be unspent")
 	} else if spent.Event != nil {
-		t.Fatalf("expected siacoin element to have no event, got %v", spent.Event)
+		t.Fatalf("expected bigfile element to have no event, got %v", spent.Event)
 	}
 
 	// spend the element
 	txn := types.V2Transaction{
-		SiacoinInputs: []types.V2SiacoinInput{
+		BigfileInputs: []types.V2BigfileInput{
 			{
-				Parent: sce[0].SiacoinElement,
+				Parent: bige[0].BigfileElement,
 				SatisfiedPolicy: types.SatisfiedPolicy{
 					Policy: senderPolicy,
 				},
 			},
 		},
-		SiacoinOutputs: []types.SiacoinOutput{
+		BigfileOutputs: []types.BigfileOutput{
 			{
-				Value:   sce[0].SiacoinOutput.Value,
+				Value:   bige[0].BigfileOutput.Value,
 				Address: receiverAddr,
 			},
 		},
@@ -1233,7 +1233,7 @@ func TestSpentElement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txn.SiacoinInputs[0].SatisfiedPolicy.Signatures = []types.Signature{
+	txn.BigfileInputs[0].SatisfiedPolicy.Signatures = []types.Signature{
 		senderPrivateKey.SignHash(cs.InputSigHash(txn)),
 	}
 
@@ -1243,57 +1243,57 @@ func TestSpentElement(t *testing.T) {
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
 	// check if the element is spent
-	spent, err = c.SpentSiacoinElement(sce[0].ID)
+	spent, err = c.SpentBigfileElement(bige[0].ID)
 	if err != nil {
 		t.Fatal(err)
 	} else if !spent.Spent {
-		t.Fatal("expected siacoin element to be spent")
+		t.Fatal("expected bigfile element to be spent")
 	} else if types.TransactionID(spent.Event.ID) != txn.ID() {
-		t.Fatalf("expected siacoin element to have event %q, got %q", txn.ID(), spent.Event.ID)
+		t.Fatalf("expected bigfile element to have event %q, got %q", txn.ID(), spent.Event.ID)
 	} else if spent.Event.Type != wallet.EventTypeV2Transaction {
-		t.Fatalf("expected siacoin element to have type %q, got %q", wallet.EventTypeV2Transaction, spent.Event.Type)
+		t.Fatalf("expected bigfile element to have type %q, got %q", wallet.EventTypeV2Transaction, spent.Event.Type)
 	}
 
 	// mine until the utxo is pruned
 	cn.MineBlocks(t, types.VoidAddress, 144)
 
-	_, err = c.SpentSiacoinElement(sce[0].ID)
+	_, err = c.SpentBigfileElement(bige[0].ID)
 	if !strings.Contains(err.Error(), "not found") {
 		t.Fatalf("expected error to contain %q, got %q", "not found", err)
 	}
 
-	sfe, basis, err := c.AddressSiafundOutputs(senderAddr, false, 0, 100)
+	bfe, basis, err := c.AddressBigfundOutputs(senderAddr, false, 0, 100)
 	if err != nil {
 		t.Fatal(err)
-	} else if len(sfe) != 1 {
-		t.Fatalf("expected 1 siafund element, got %v", len(sfe))
+	} else if len(bfe) != 1 {
+		t.Fatalf("expected 1 bigfund element, got %v", len(bfe))
 	}
 
-	// check if the siafund element is spent
-	spent, err = c.SpentSiafundElement(sfe[0].ID)
+	// check if the bigfund element is spent
+	spent, err = c.SpentBigfundElement(bfe[0].ID)
 	if err != nil {
 		t.Fatal(err)
 	} else if spent.Spent {
-		t.Fatal("expected siafund element to be unspent")
+		t.Fatal("expected bigfund element to be unspent")
 	} else if spent.Event != nil {
-		t.Fatalf("expected siafund element to have no event, got %v", spent.Event)
+		t.Fatalf("expected bigfund element to have no event, got %v", spent.Event)
 	}
 
 	// spend the element
 	txn = types.V2Transaction{
-		SiafundInputs: []types.V2SiafundInput{
+		BigfundInputs: []types.V2BigfundInput{
 			{
-				Parent: sfe[0].SiafundElement,
+				Parent: bfe[0].BigfundElement,
 				SatisfiedPolicy: types.SatisfiedPolicy{
 					Policy: senderPolicy,
 				},
 				ClaimAddress: senderAddr,
 			},
 		},
-		SiafundOutputs: []types.SiafundOutput{
+		BigfundOutputs: []types.BigfundOutput{
 			{
 				Address: receiverAddr,
-				Value:   sfe[0].SiafundOutput.Value,
+				Value:   bfe[0].BigfundOutput.Value,
 			},
 		},
 	}
@@ -1301,7 +1301,7 @@ func TestSpentElement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txn.SiafundInputs[0].SatisfiedPolicy.Signatures = []types.Signature{
+	txn.BigfundInputs[0].SatisfiedPolicy.Signatures = []types.Signature{
 		senderPrivateKey.SignHash(cs.InputSigHash(txn)),
 	}
 
@@ -1311,21 +1311,21 @@ func TestSpentElement(t *testing.T) {
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
 	// check if the element is spent
-	spent, err = c.SpentSiafundElement(sfe[0].ID)
+	spent, err = c.SpentBigfundElement(bfe[0].ID)
 	if err != nil {
 		t.Fatal(err)
 	} else if !spent.Spent {
-		t.Fatal("expected siafund element to be spent")
+		t.Fatal("expected bigfund element to be spent")
 	} else if types.TransactionID(spent.Event.ID) != txn.ID() {
-		t.Fatalf("expected siafund element to have event %q, got %q", txn.ID(), spent.Event.ID)
+		t.Fatalf("expected bigfund element to have event %q, got %q", txn.ID(), spent.Event.ID)
 	} else if spent.Event.Type != wallet.EventTypeV2Transaction {
-		t.Fatalf("expected siafund element to have type %q, got %q", wallet.EventTypeV2Transaction, spent.Event.Type)
+		t.Fatalf("expected bigfund element to have type %q, got %q", wallet.EventTypeV2Transaction, spent.Event.Type)
 	}
 
 	// mine until the utxo is pruned
 	cn.MineBlocks(t, types.VoidAddress, 144)
 
-	_, err = c.SpentSiafundElement(sfe[0].ID)
+	_, err = c.SpentBigfundElement(bfe[0].ID)
 	if !strings.Contains(err.Error(), "not found") {
 		t.Fatalf("expected error to contain %q, got %q", "not found", err)
 	}
@@ -1506,8 +1506,8 @@ func TestV2TransactionUpdateBasis(t *testing.T) {
 	// fund the wallet
 	cn.MineBlocks(t, addr, 5+int(n.MaturityDelay))
 
-	resp, err := wc.ConstructV2([]types.SiacoinOutput{
-		{Value: types.Siacoins(100), Address: addr},
+	resp, err := wc.ConstructV2([]types.BigfileOutput{
+		{Value: types.Bigfiles(100), Address: addr},
 	}, nil, addr)
 	if err != nil {
 		t.Fatal(err)
@@ -1521,8 +1521,8 @@ func TestV2TransactionUpdateBasis(t *testing.T) {
 	}
 	sigHash := cs.InputSigHash(parentTxn)
 	sig := pk.SignHash(sigHash)
-	for i := range parentTxn.SiacoinInputs {
-		parentTxn.SiacoinInputs[i].SatisfiedPolicy.Signatures = []types.Signature{sig}
+	for i := range parentTxn.BigfileInputs {
+		parentTxn.BigfileInputs[i].SatisfiedPolicy.Signatures = []types.Signature{sig}
 	}
 
 	// broadcast the transaction
@@ -1532,22 +1532,22 @@ func TestV2TransactionUpdateBasis(t *testing.T) {
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
 	// create a child transaction
-	sce := parentTxn.EphemeralSiacoinOutput(0)
+	bige := parentTxn.EphemeralBigfileOutput(0)
 	childTxn := types.V2Transaction{
-		SiacoinInputs: []types.V2SiacoinInput{
+		BigfileInputs: []types.V2BigfileInput{
 			{
-				Parent: sce,
+				Parent: bige,
 				SatisfiedPolicy: types.SatisfiedPolicy{
 					Policy: policy,
 				},
 			},
 		},
-		SiacoinOutputs: []types.SiacoinOutput{
-			{Address: types.VoidAddress, Value: sce.SiacoinOutput.Value},
+		BigfileOutputs: []types.BigfileOutput{
+			{Address: types.VoidAddress, Value: bige.BigfileOutput.Value},
 		},
 	}
 	childSigHash := cs.InputSigHash(childTxn)
-	childTxn.SiacoinInputs[0].SatisfiedPolicy.Signatures = []types.Signature{pk.SignHash(childSigHash)}
+	childTxn.BigfileInputs[0].SatisfiedPolicy.Signatures = []types.Signature{pk.SignHash(childSigHash)}
 
 	txnset := []types.V2Transaction{parentTxn, childTxn}
 
@@ -1581,40 +1581,40 @@ func TestAddressTPool(t *testing.T) {
 	addr1 := types.StandardUnlockHash(pk.PublicKey())
 
 	n, genesisBlock := testutil.V2Network()
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(100),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(100),
 		Address: addr1,
 	}
 
 	cn := testutil.NewConsensusNode(t, n, genesisBlock, log)
 	c := startWalletServer(t, cn, log, wallet.WithIndexMode(wallet.IndexModeFull))
 
-	assertSiacoinElement := func(t *testing.T, id types.SiacoinOutputID, value types.Currency, confirmations uint64) {
+	assertBigfileElement := func(t *testing.T, id types.BigfileOutputID, value types.Currency, confirmations uint64) {
 		t.Helper()
 
-		utxos, _, err := c.AddressSiacoinOutputs(addr1, true, 0, 1)
+		utxos, _, err := c.AddressBigfileOutputs(addr1, true, 0, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, sce := range utxos {
-			if sce.ID == id {
-				if !sce.SiacoinOutput.Value.Equals(value) {
-					t.Fatalf("expected value %v, got %v", value, sce.SiacoinOutput.Value)
-				} else if sce.Confirmations != confirmations {
-					t.Fatalf("expected confirmations %d, got %d", confirmations, sce.Confirmations)
+		for _, bige := range utxos {
+			if bige.ID == id {
+				if !bige.BigfileOutput.Value.Equals(value) {
+					t.Fatalf("expected value %v, got %v", value, bige.BigfileOutput.Value)
+				} else if bige.Confirmations != confirmations {
+					t.Fatalf("expected confirmations %d, got %d", confirmations, bige.Confirmations)
 				}
 				return
 			}
 		}
-		t.Fatalf("expected siacoin element with ID %q not found", id)
+		t.Fatalf("expected bigfile element with ID %q not found", id)
 	}
 
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
-	airdropID := genesisBlock.Transactions[0].SiacoinOutputID(0)
-	assertSiacoinElement(t, airdropID, types.Siacoins(100), 2)
+	airdropID := genesisBlock.Transactions[0].BigfileOutputID(0)
+	assertBigfileElement(t, airdropID, types.Bigfiles(100), 2)
 
-	utxos, basis, err := c.AddressSiacoinOutputs(addr1, true, 0, 100)
+	utxos, basis, err := c.AddressBigfileOutputs(addr1, true, 0, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1624,9 +1624,9 @@ func TestAddressTPool(t *testing.T) {
 		t.Fatal(err)
 	}
 	txn := types.V2Transaction{
-		SiacoinInputs: []types.V2SiacoinInput{
+		BigfileInputs: []types.V2BigfileInput{
 			{
-				Parent: utxos[0].SiacoinElement,
+				Parent: utxos[0].BigfileElement,
 				SatisfiedPolicy: types.SatisfiedPolicy{
 					Policy: types.SpendPolicy{
 						Type: types.PolicyTypeUnlockConditions(uc),
@@ -1634,19 +1634,19 @@ func TestAddressTPool(t *testing.T) {
 				},
 			},
 		},
-		SiacoinOutputs: []types.SiacoinOutput{
+		BigfileOutputs: []types.BigfileOutput{
 			{
 				Address: types.VoidAddress,
-				Value:   types.Siacoins(25),
+				Value:   types.Bigfiles(25),
 			},
 			{
 				Address: addr1,
-				Value:   types.Siacoins(75),
+				Value:   types.Bigfiles(75),
 			},
 		},
 	}
 	sigHash := cs.InputSigHash(txn)
-	txn.SiacoinInputs[0].SatisfiedPolicy.Signatures = []types.Signature{
+	txn.BigfileInputs[0].SatisfiedPolicy.Signatures = []types.Signature{
 		pk.SignHash(sigHash),
 	}
 
@@ -1654,9 +1654,9 @@ func TestAddressTPool(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertSiacoinElement(t, txn.SiacoinOutputID(txn.ID(), 1), types.Siacoins(75), 0)
+	assertBigfileElement(t, txn.BigfileOutputID(txn.ID(), 1), types.Bigfiles(75), 0)
 	cn.MineBlocks(t, types.VoidAddress, 1)
-	assertSiacoinElement(t, txn.SiacoinOutputID(txn.ID(), 1), types.Siacoins(75), 1)
+	assertBigfileElement(t, txn.BigfileOutputID(txn.ID(), 1), types.Bigfiles(75), 1)
 }
 
 func TestEphemeralTransactions(t *testing.T) {
@@ -1668,8 +1668,8 @@ func TestEphemeralTransactions(t *testing.T) {
 	addr1 := sp.Address()
 
 	n, genesisBlock := testutil.V2Network()
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(100),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(100),
 		Address: addr1,
 	}
 
@@ -1678,29 +1678,29 @@ func TestEphemeralTransactions(t *testing.T) {
 
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
-	sces, basis, err := c.AddressSiacoinOutputs(addr1, true, 0, 100)
+	biges, basis, err := c.AddressBigfileOutputs(addr1, true, 0, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	txn := types.V2Transaction{
-		SiacoinInputs: []types.V2SiacoinInput{
+		BigfileInputs: []types.V2BigfileInput{
 
 			{
-				Parent: sces[0].SiacoinElement,
+				Parent: biges[0].BigfileElement,
 				SatisfiedPolicy: types.SatisfiedPolicy{
 					Policy: sp,
 				},
 			},
 		},
-		SiacoinOutputs: []types.SiacoinOutput{
+		BigfileOutputs: []types.BigfileOutput{
 			{
 				Address: types.VoidAddress,
-				Value:   types.Siacoins(50),
+				Value:   types.Bigfiles(50),
 			},
 			{
 				Address: addr1,
-				Value:   types.Siacoins(50),
+				Value:   types.Bigfiles(50),
 			},
 		},
 	}
@@ -1709,66 +1709,66 @@ func TestEphemeralTransactions(t *testing.T) {
 		t.Fatal(err)
 	}
 	sigHash := cs.InputSigHash(txn)
-	txn.SiacoinInputs[0].SatisfiedPolicy.Signatures = []types.Signature{pk.SignHash(sigHash)}
-	expectedOutputID := txn.SiacoinOutputID(txn.ID(), 1)
+	txn.BigfileInputs[0].SatisfiedPolicy.Signatures = []types.Signature{pk.SignHash(sigHash)}
+	expectedOutputID := txn.BigfileOutputID(txn.ID(), 1)
 
 	if _, err := c.TxpoolBroadcast(basis, nil, []types.V2Transaction{txn}); err != nil {
 		t.Fatal(err)
 	}
 
-	sces, basis, err = c.AddressSiacoinOutputs(addr1, true, 0, 100)
+	biges, basis, err = c.AddressBigfileOutputs(addr1, true, 0, 100)
 	if err != nil {
 		t.Fatal(err)
-	} else if len(sces) != 1 {
-		t.Fatalf("expected 1 siacoin element, got %v", len(sces))
-	} else if sces[0].ID != expectedOutputID {
-		t.Fatalf("expected siacoin element ID %q, got %q", expectedOutputID, sces[0].ID)
-	} else if sces[0].StateElement.LeafIndex != types.UnassignedLeafIndex {
-		t.Fatalf("expected siacoin element to have unassigned leaf index, got %v", sces[0].StateElement.LeafIndex)
+	} else if len(biges) != 1 {
+		t.Fatalf("expected 1 bigfile element, got %v", len(biges))
+	} else if biges[0].ID != expectedOutputID {
+		t.Fatalf("expected bigfile element ID %q, got %q", expectedOutputID, biges[0].ID)
+	} else if biges[0].StateElement.LeafIndex != types.UnassignedLeafIndex {
+		t.Fatalf("expected bigfile element to have unassigned leaf index, got %v", biges[0].StateElement.LeafIndex)
 	}
 
 	txn2 := types.V2Transaction{
-		SiacoinInputs: []types.V2SiacoinInput{
+		BigfileInputs: []types.V2BigfileInput{
 			{
-				Parent: sces[0].SiacoinElement,
+				Parent: biges[0].BigfileElement,
 				SatisfiedPolicy: types.SatisfiedPolicy{
 					Policy: sp,
 				},
 			},
 		},
-		SiacoinOutputs: []types.SiacoinOutput{
+		BigfileOutputs: []types.BigfileOutput{
 			{
 				Address: types.VoidAddress,
-				Value:   sces[0].SiacoinOutput.Value,
+				Value:   biges[0].BigfileOutput.Value,
 			},
 		},
 	}
 	sigHash = cs.InputSigHash(txn2)
-	txn2.SiacoinInputs[0].SatisfiedPolicy.Signatures = []types.Signature{pk.SignHash(sigHash)}
+	txn2.BigfileInputs[0].SatisfiedPolicy.Signatures = []types.Signature{pk.SignHash(sigHash)}
 
 	// mine a block so the basis is behind
 	cn.MineBlocks(t, types.VoidAddress, 1)
 
-	sces, _, err = c.AddressSiacoinOutputs(addr1, true, 0, 100)
+	biges, _, err = c.AddressBigfileOutputs(addr1, true, 0, 100)
 	if err != nil {
 		t.Fatal(err)
-	} else if len(sces) != 1 {
-		t.Fatalf("expected no siacoin elements, got %v", len(sces))
-	} else if sces[0].ID != expectedOutputID {
-		t.Fatalf("expected siacoin element ID %q, got %q", expectedOutputID, sces[0].ID)
-	} else if sces[0].StateElement.LeafIndex == types.UnassignedLeafIndex {
-		t.Fatalf("expected siacoin element to have leaf index, got %v", sces[0].StateElement.LeafIndex)
+	} else if len(biges) != 1 {
+		t.Fatalf("expected no bigfile elements, got %v", len(biges))
+	} else if biges[0].ID != expectedOutputID {
+		t.Fatalf("expected bigfile element ID %q, got %q", expectedOutputID, biges[0].ID)
+	} else if biges[0].StateElement.LeafIndex == types.UnassignedLeafIndex {
+		t.Fatalf("expected bigfile element to have leaf index, got %v", biges[0].StateElement.LeafIndex)
 	}
 
 	if _, err := c.TxpoolBroadcast(basis, nil, []types.V2Transaction{txn2}); err != nil {
 		t.Fatal(err)
 	}
 
-	sces, _, err = c.AddressSiacoinOutputs(addr1, true, 0, 100)
+	biges, _, err = c.AddressBigfileOutputs(addr1, true, 0, 100)
 	if err != nil {
 		t.Fatal(err)
-	} else if len(sces) != 0 {
-		t.Fatalf("expected no siacoin elements, got %v", len(sces))
+	} else if len(biges) != 0 {
+		t.Fatalf("expected no bigfile elements, got %v", len(biges))
 	}
 }
 
@@ -1783,8 +1783,8 @@ func TestBroadcastRace(t *testing.T) {
 	addr1 := sp.Address()
 
 	n, genesisBlock := testutil.V2Network()
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(100000),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(100000),
 		Address: addr1,
 	}
 
@@ -1813,23 +1813,23 @@ func TestBroadcastRace(t *testing.T) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			sces, basis, err := c.AddressSiacoinOutputs(addr1, true, 0, 100)
+			biges, basis, err := c.AddressBigfileOutputs(addr1, true, 0, 100)
 			if err != nil {
 				panic(err)
 			}
 
-			burn := types.Siacoins(1)
-			rem := sces[0].SiacoinOutput.Value.Sub(burn)
+			burn := types.Bigfiles(1)
+			rem := biges[0].BigfileOutput.Value.Sub(burn)
 			txn := types.V2Transaction{
-				SiacoinInputs: []types.V2SiacoinInput{
+				BigfileInputs: []types.V2BigfileInput{
 					{
-						Parent: sces[0].SiacoinElement,
+						Parent: biges[0].BigfileElement,
 						SatisfiedPolicy: types.SatisfiedPolicy{
 							Policy: sp,
 						},
 					},
 				},
-				SiacoinOutputs: []types.SiacoinOutput{
+				BigfileOutputs: []types.BigfileOutput{
 					{
 						Address: types.VoidAddress,
 						Value:   burn,
@@ -1845,7 +1845,7 @@ func TestBroadcastRace(t *testing.T) {
 				t.Fatal(err)
 			}
 			sigHash := cs.InputSigHash(txn)
-			txn.SiacoinInputs[0].SatisfiedPolicy.Signatures = []types.Signature{pk.SignHash(sigHash)}
+			txn.BigfileInputs[0].SatisfiedPolicy.Signatures = []types.Signature{pk.SignHash(sigHash)}
 			if _, err := c.TxpoolBroadcast(basis, nil, []types.V2Transaction{txn}); err != nil {
 				t.Fatal(err)
 			}
@@ -1865,8 +1865,8 @@ func TestTxPoolOverwriteProofs(t *testing.T) {
 	receiverPolicy := types.SpendPolicy{Type: types.PolicyTypeUnlockConditions(types.StandardUnlockConditions(receiverPrivateKey.PublicKey()))}
 	receiverAddr := receiverPolicy.Address()
 
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(100),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(100),
 		Address: senderAddr,
 	}
 
@@ -1891,8 +1891,8 @@ func TestTxPoolOverwriteProofs(t *testing.T) {
 	}
 	cm.MineBlocks(t, types.VoidAddress, 1)
 
-	resp, err := wc.ConstructV2([]types.SiacoinOutput{
-		{Value: types.Siacoins(1), Address: receiverAddr},
+	resp, err := wc.ConstructV2([]types.BigfileOutput{
+		{Value: types.Bigfiles(1), Address: receiverAddr},
 	}, nil, senderAddr)
 	if err != nil {
 		t.Fatal(err)
@@ -1905,8 +1905,8 @@ func TestTxPoolOverwriteProofs(t *testing.T) {
 
 	// sign the transaction
 	sigHash := cs.InputSigHash(resp.Transaction)
-	for i := range resp.Transaction.SiacoinInputs {
-		resp.Transaction.SiacoinInputs[i].SatisfiedPolicy.Signatures = []types.Signature{senderPrivateKey.SignHash(sigHash)}
+	for i := range resp.Transaction.BigfileInputs {
+		resp.Transaction.BigfileInputs[i].SatisfiedPolicy.Signatures = []types.Signature{senderPrivateKey.SignHash(sigHash)}
 	}
 
 	// assert the transaction is valid
@@ -1920,7 +1920,7 @@ func TestTxPoolOverwriteProofs(t *testing.T) {
 	}
 
 	// corrupt the proof
-	resp.Transaction.SiacoinInputs[0].Parent.StateElement.MerkleProof[frand.Intn(len(resp.Transaction.SiacoinInputs[0].Parent.StateElement.MerkleProof))] = frand.Entropy256()
+	resp.Transaction.BigfileInputs[0].Parent.StateElement.MerkleProof[frand.Intn(len(resp.Transaction.BigfileInputs[0].Parent.StateElement.MerkleProof))] = frand.Entropy256()
 
 	// assert the transaction is invalid
 	ms = consensus.NewMidState(cs)
@@ -1942,15 +1942,15 @@ func TestTxPoolOverwriteProofs(t *testing.T) {
 	} else if len(unconfirmed) != 1 {
 		t.Fatalf("expected 1 unconfirmed event, got %v", len(unconfirmed))
 	}
-	expectedValue := types.Siacoins(1).Add(resp.EstimatedFee)
+	expectedValue := types.Bigfiles(1).Add(resp.EstimatedFee)
 	sent := unconfirmed[0]
 	switch {
 	case types.TransactionID(sent.ID) != resp.ID:
 		t.Fatalf("expected unconfirmed event to have transaction ID %q, got %q", resp.ID, sent.ID)
 	case sent.Type != wallet.EventTypeV2Transaction:
 		t.Fatalf("expected unconfirmed event to have type %q, got %q", wallet.EventTypeV2Transaction, sent.Type)
-	case !sent.SiacoinOutflow().Sub(sent.SiacoinInflow()).Equals(expectedValue):
-		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", expectedValue, sent.SiacoinOutflow().Sub(sent.SiacoinInflow()))
+	case !sent.BigfileOutflow().Sub(sent.BigfileInflow()).Equals(expectedValue):
+		t.Fatalf("expected unconfirmed event to have outflow of %v, got %v", expectedValue, sent.BigfileOutflow().Sub(sent.BigfileInflow()))
 	}
 	cm.MineBlocks(t, types.VoidAddress, 1)
 
@@ -1966,8 +1966,8 @@ func TestTxPoolOverwriteProofs(t *testing.T) {
 		t.Fatalf("expected confirmed event to have transaction ID %q, got %q", resp.ID, sent.ID)
 	case sent.Type != wallet.EventTypeV2Transaction:
 		t.Fatalf("expected confirmed event to have type %q, got %q", wallet.EventTypeV2Transaction, sent.Type)
-	case !sent.SiacoinOutflow().Sub(sent.SiacoinInflow()).Equals(expectedValue):
-		t.Fatalf("expected confirmed event to have outflow of %v, got %v", expectedValue, sent.SiacoinOutflow().Sub(sent.SiacoinInflow()))
+	case !sent.BigfileOutflow().Sub(sent.BigfileInflow()).Equals(expectedValue):
+		t.Fatalf("expected confirmed event to have outflow of %v, got %v", expectedValue, sent.BigfileOutflow().Sub(sent.BigfileInflow()))
 	}
 }
 
@@ -1983,8 +1983,8 @@ func TestTxPoolOverwriteProofsEphemeral(t *testing.T) {
 	receiverPolicy := types.SpendPolicy{Type: types.PolicyTypeUnlockConditions(types.StandardUnlockConditions(receiverPrivateKey.PublicKey()))}
 	receiverAddr := receiverPolicy.Address()
 
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(100),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(100),
 		Address: senderAddr,
 	}
 
@@ -2009,8 +2009,8 @@ func TestTxPoolOverwriteProofsEphemeral(t *testing.T) {
 	}
 	cm.MineBlocks(t, types.VoidAddress, 1)
 
-	resp, err := wc.ConstructV2([]types.SiacoinOutput{
-		{Value: types.Siacoins(1), Address: senderAddr},
+	resp, err := wc.ConstructV2([]types.BigfileOutput{
+		{Value: types.Bigfiles(1), Address: senderAddr},
 	}, nil, senderAddr)
 	if err != nil {
 		t.Fatal(err)
@@ -2023,31 +2023,31 @@ func TestTxPoolOverwriteProofsEphemeral(t *testing.T) {
 
 	// sign the transaction
 	sigHash := cs.InputSigHash(resp.Transaction)
-	for i := range resp.Transaction.SiacoinInputs {
-		resp.Transaction.SiacoinInputs[i].SatisfiedPolicy.Signatures = []types.Signature{senderPrivateKey.SignHash(sigHash)}
+	for i := range resp.Transaction.BigfileInputs {
+		resp.Transaction.BigfileInputs[i].SatisfiedPolicy.Signatures = []types.Signature{senderPrivateKey.SignHash(sigHash)}
 	}
 
 	basis := resp.Basis
 	txnset := []types.V2Transaction{resp.Transaction, {
-		SiacoinInputs: []types.V2SiacoinInput{
+		BigfileInputs: []types.V2BigfileInput{
 			{
-				Parent: resp.Transaction.EphemeralSiacoinOutput(0),
+				Parent: resp.Transaction.EphemeralBigfileOutput(0),
 				SatisfiedPolicy: types.SatisfiedPolicy{
 					Policy: senderPolicy,
 				},
 			},
 		},
-		SiacoinOutputs: []types.SiacoinOutput{
-			{Address: receiverAddr, Value: types.Siacoins(1)},
+		BigfileOutputs: []types.BigfileOutput{
+			{Address: receiverAddr, Value: types.Bigfiles(1)},
 		},
 	}}
 	sigHash = cs.InputSigHash(txnset[1])
-	for i := range txnset[1].SiacoinInputs {
-		txnset[1].SiacoinInputs[i].SatisfiedPolicy.Signatures = []types.Signature{senderPrivateKey.SignHash(sigHash)}
+	for i := range txnset[1].BigfileInputs {
+		txnset[1].BigfileInputs[i].SatisfiedPolicy.Signatures = []types.Signature{senderPrivateKey.SignHash(sigHash)}
 	}
 
 	// corrupt the proof
-	txnset[0].SiacoinInputs[0].Parent.StateElement.MerkleProof[frand.Intn(len(resp.Transaction.SiacoinInputs[0].Parent.StateElement.MerkleProof))] = frand.Entropy256()
+	txnset[0].BigfileInputs[0].Parent.StateElement.MerkleProof[frand.Intn(len(resp.Transaction.BigfileInputs[0].Parent.StateElement.MerkleProof))] = frand.Entropy256()
 
 	if broadcastResp, err := c.TxpoolBroadcast(basis, nil, txnset); err != nil {
 		t.Fatal(err)
@@ -2089,11 +2089,11 @@ func TestWalletConfirmations(t *testing.T) {
 	n, genesisBlock := testutil.V1Network()
 	giftPrivateKey := types.GeneratePrivateKey()
 	giftAddress := types.StandardUnlockHash(giftPrivateKey.PublicKey())
-	genesisBlock.Transactions[0].SiacoinOutputs[0] = types.SiacoinOutput{
-		Value:   types.Siacoins(1),
+	genesisBlock.Transactions[0].BigfileOutputs[0] = types.BigfileOutput{
+		Value:   types.Bigfiles(1),
 		Address: giftAddress,
 	}
-	genesisBlock.Transactions[0].SiafundOutputs[0].Address = giftAddress
+	genesisBlock.Transactions[0].BigfundOutputs[0].Address = giftAddress
 
 	cn := testutil.NewConsensusNode(t, n, genesisBlock, log)
 	c := startWalletServer(t, cn, log)
@@ -2121,27 +2121,27 @@ func TestWalletConfirmations(t *testing.T) {
 	c.Rescan(0)
 
 	// send gift to wallet
-	giftSCOID := genesisBlock.Transactions[0].SiacoinOutputID(0)
+	giftSCOID := genesisBlock.Transactions[0].BigfileOutputID(0)
 	txn := types.Transaction{
-		SiacoinInputs: []types.SiacoinInput{{
+		BigfileInputs: []types.BigfileInput{{
 			ParentID:         giftSCOID,
 			UnlockConditions: types.StandardUnlockConditions(giftPrivateKey.PublicKey()),
 		}},
-		SiacoinOutputs: []types.SiacoinOutput{
-			{Address: addr, Value: types.Siacoins(1)},
+		BigfileOutputs: []types.BigfileOutput{
+			{Address: addr, Value: types.Bigfiles(1)},
 		},
-		SiafundInputs: []types.SiafundInput{{
-			ParentID:         genesisBlock.Transactions[0].SiafundOutputID(0),
+		BigfundInputs: []types.BigfundInput{{
+			ParentID:         genesisBlock.Transactions[0].BigfundOutputID(0),
 			UnlockConditions: types.StandardUnlockConditions(giftPrivateKey.PublicKey()),
 		}},
-		SiafundOutputs: []types.SiafundOutput{
-			{Address: addr, Value: genesisBlock.Transactions[0].SiafundOutputs[0].Value},
+		BigfundOutputs: []types.BigfundOutput{
+			{Address: addr, Value: genesisBlock.Transactions[0].BigfundOutputs[0].Value},
 		},
 		Signatures: []types.TransactionSignature{{
 			ParentID:      types.Hash256(giftSCOID),
 			CoveredFields: types.CoveredFields{WholeTransaction: true},
 		}, {
-			ParentID:      types.Hash256(genesisBlock.Transactions[0].SiafundOutputID(0)),
+			ParentID:      types.Hash256(genesisBlock.Transactions[0].BigfundOutputID(0)),
 			CoveredFields: types.CoveredFields{WholeTransaction: true},
 		}},
 	}
@@ -2153,7 +2153,7 @@ func TestWalletConfirmations(t *testing.T) {
 
 	sig := giftPrivateKey.SignHash(cs.WholeSigHash(txn, types.Hash256(giftSCOID), 0, 0, nil))
 	txn.Signatures[0].Signature = sig[:]
-	sig2 := giftPrivateKey.SignHash(cs.WholeSigHash(txn, types.Hash256(genesisBlock.Transactions[0].SiafundOutputID(0)), 0, 0, nil))
+	sig2 := giftPrivateKey.SignHash(cs.WholeSigHash(txn, types.Hash256(genesisBlock.Transactions[0].BigfundOutputID(0)), 0, 0, nil))
 	txn.Signatures[1].Signature = sig2[:]
 
 	// broadcast the transaction to the transaction pool
@@ -2167,7 +2167,7 @@ func TestWalletConfirmations(t *testing.T) {
 	assertConfirmations := func(t *testing.T, n uint64) {
 		t.Helper()
 
-		outputs, basis, err := wc.SiacoinOutputs(0, 100)
+		outputs, basis, err := wc.BigfileOutputs(0, 100)
 		if err != nil {
 			t.Fatal(err)
 		} else if len(outputs) != 1 {
@@ -2178,15 +2178,15 @@ func TestWalletConfirmations(t *testing.T) {
 			t.Fatalf("expected %d confirmation, got %v", n, outputs[0].Confirmations)
 		}
 
-		sfe, basis, err := wc.SiafundOutputs(0, 100)
+		bfe, basis, err := wc.BigfundOutputs(0, 100)
 		if err != nil {
 			t.Fatal(err)
-		} else if len(sfe) != 1 {
-			t.Fatal("should have one siafund output, got", len(sfe))
+		} else if len(bfe) != 1 {
+			t.Fatal("should have one bigfund output, got", len(bfe))
 		} else if basis != cn.Chain.Tip() {
 			t.Fatalf("basis should be %v, got %v", cn.Chain.Tip(), basis)
-		} else if sfe[0].Confirmations != n {
-			t.Fatalf("expected %d confirmation, got %v", n, sfe[0].Confirmations)
+		} else if bfe[0].Confirmations != n {
+			t.Fatalf("expected %d confirmation, got %v", n, bfe[0].Confirmations)
 		}
 	}
 

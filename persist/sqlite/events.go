@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"go.sia.tech/core/types"
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/walletd/v2/wallet"
 )
 
 // Events returns the events with the given event IDs. If an event is not found,
@@ -33,7 +33,7 @@ func (s *Store) Events(eventIDs []types.Hash256) (events []wallet.Event, err err
 	ev.event_data
 FROM events ev
 INNER JOIN event_addresses ea ON (ev.id = ea.event_id)
-INNER JOIN sia_addresses sa ON (ea.address_id = sa.id)
+INNER JOIN bigfile_addresses sa ON (ea.address_id = sa.id)
 INNER JOIN chain_indices ci ON (ev.chain_index_id = ci.id)
 WHERE ev.event_id = $1`
 
@@ -89,7 +89,7 @@ func getEventsByID(tx *txn, eventIDs []int64) (events []wallet.Event, err error)
 	ev.event_data
 FROM events ev
 INNER JOIN event_addresses ea ON (ev.id = ea.event_id)
-INNER JOIN sia_addresses sa ON (ea.address_id = sa.id)
+INNER JOIN bigfile_addresses sa ON (ea.address_id = sa.id)
 INNER JOIN chain_indices ci ON (ev.chain_index_id = ci.id)
 WHERE ev.id=$1`)
 	if err != nil {
@@ -131,7 +131,7 @@ func scanEvent(s scanner, scanHeight uint64) (ev wallet.Event, eventID int64, er
 		ev.Data = decodeEventData[wallet.EventV1ContractResolution](dec)
 	case wallet.EventTypeV2ContractResolution:
 		ev.Data = decodeEventData[wallet.EventV2ContractResolution](dec)
-	case wallet.EventTypeSiafundClaim, wallet.EventTypeMinerPayout, wallet.EventTypeFoundationSubsidy:
+	case wallet.EventTypeBigfundClaim, wallet.EventTypeMinerPayout, wallet.EventTypeFoundationSubsidy:
 		ev.Data = decodeEventData[wallet.EventPayout](dec)
 	default:
 		return wallet.Event{}, 0, fmt.Errorf("unknown event type: %q", ev.Type)

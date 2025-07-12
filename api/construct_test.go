@@ -1,9 +1,9 @@
 package api_test
 
 import (
-	"go.sia.tech/core/types"
-	"go.sia.tech/walletd/v2/api"
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/walletd/v2/api"
+	"go.thebigfile.com/walletd/v2/wallet"
 )
 
 func ExampleWalletClient_Construct() {
@@ -56,8 +56,8 @@ func ExampleWalletClient_Construct() {
 	}
 
 	// create a transaction
-	resp, err := wc.Construct([]types.SiacoinOutput{
-		{Address: types.VoidAddress, Value: types.Siacoins(1)},
+	resp, err := wc.Construct([]types.BigfileOutput{
+		{Address: types.VoidAddress, Value: types.Bigfiles(1)},
 	}, nil, address)
 	if err != nil {
 		panic(err)

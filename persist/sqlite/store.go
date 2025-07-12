@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/mattn/go-sqlite3"
-	"go.sia.tech/walletd/v2/wallet"
+	"go.thebigfile.com/walletd/v2/wallet"
 	"go.uber.org/zap"
 )
 

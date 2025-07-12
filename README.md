@@ -232,13 +232,13 @@ You can create a custom local testnet by creating a network.json file locally an
     "transactions": [
       {
         "id": "268ef8627241b3eb505cea69b21379c4b91c21dfc4b3f3f58c66316249058cfd",
-        "siacoinOutputs": [
+        "bigfileOutputs": [
           {
             "value": "1000000000000000000000000000000000000",
             "address": "3d7f707d05f2e0ec7ccc9220ed7c8af3bc560fbee84d068c2cc28151d617899e1ee8bc069946"
           }
         ],
-        "siafundOutputs": [
+        "bigfundOutputs": [
           {
             "value": 10000,
             "address": "053b2def3cbdd078c19d62ce2b4f0b1a3c5e0ffbeeff01280efb1f8969b2f5bb4fdc680f0807"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"go.sia.tech/core/types"
+	"go.thebigfile.com/core/types"
 )
 
 // mineBlock constructs a block from the provided address and the transactions
@@ -17,7 +17,7 @@ func mineBlock(ctx context.Context, cm ChainManager, addr types.Address) (types.
 	b := types.Block{
 		ParentID:  cs.Index.ID,
 		Timestamp: types.CurrentTimestamp(),
-		MinerPayouts: []types.SiacoinOutput{{
+		MinerPayouts: []types.BigfileOutput{{
 			Value:   cs.BlockReward(),
 			Address: addr,
 		}},

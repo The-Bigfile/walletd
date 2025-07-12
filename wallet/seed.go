@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sync"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/wallet"
 	"lukechampine.com/frand"
 )
 
@@ -96,15 +96,15 @@ func (sav *SeedAddressVault) SignTransaction(cs consensus.State, txn *types.Tran
 
 	if len(toSign) == 0 {
 		// lazy mode: add standard sigs for every input we own
-		for _, sci := range txn.SiacoinInputs {
-			if index, ok := sav.addrs[sci.UnlockConditions.UnlockHash()]; ok {
-				txn.Signatures = append(txn.Signatures, StandardTransactionSignature(types.Hash256(sci.ParentID)))
+		for _, bigi := range txn.BigfileInputs {
+			if index, ok := sav.addrs[bigi.UnlockConditions.UnlockHash()]; ok {
+				txn.Signatures = append(txn.Signatures, StandardTransactionSignature(types.Hash256(bigi.ParentID)))
 				SignTransaction(cs, txn, len(txn.Signatures)-1, sav.seed.PrivateKey(index))
 			}
 		}
-		for _, sfi := range txn.SiafundInputs {
-			if index, ok := sav.addrs[sfi.UnlockConditions.UnlockHash()]; ok {
-				txn.Signatures = append(txn.Signatures, StandardTransactionSignature(types.Hash256(sfi.ParentID)))
+		for _, bfi := range txn.BigfundInputs {
+			if index, ok := sav.addrs[bfi.UnlockConditions.UnlockHash()]; ok {
+				txn.Signatures = append(txn.Signatures, StandardTransactionSignature(types.Hash256(bfi.ParentID)))
 				SignTransaction(cs, txn, len(txn.Signatures)-1, sav.seed.PrivateKey(index))
 			}
 		}
@@ -112,14 +112,14 @@ func (sav *SeedAddressVault) SignTransaction(cs consensus.State, txn *types.Tran
 	}
 
 	sigAddr := func(id types.Hash256) (types.Address, bool) {
-		for _, sci := range txn.SiacoinInputs {
-			if types.Hash256(sci.ParentID) == id {
-				return sci.UnlockConditions.UnlockHash(), true
+		for _, bigi := range txn.BigfileInputs {
+			if types.Hash256(bigi.ParentID) == id {
+				return bigi.UnlockConditions.UnlockHash(), true
 			}
 		}
-		for _, sfi := range txn.SiafundInputs {
-			if types.Hash256(sfi.ParentID) == id {
-				return sfi.UnlockConditions.UnlockHash(), true
+		for _, bfi := range txn.BigfundInputs {
+			if types.Hash256(bfi.ParentID) == id {
+				return bfi.UnlockConditions.UnlockHash(), true
 			}
 		}
 		for _, fcr := range txn.FileContractRevisions {

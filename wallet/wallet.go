@@ -6,18 +6,18 @@ import (
 	"strconv"
 	"time"
 
-	"go.sia.tech/core/consensus"
-	"go.sia.tech/core/types"
-	"go.sia.tech/coreutils/wallet"
+	"go.thebigfile.com/core/consensus"
+	"go.thebigfile.com/core/types"
+	"go.thebigfile.com/coreutils/wallet"
 )
 
 // event types indicate the source of an event. Events can
-// either be created by sending Siacoins between addresses or they can be
-// created by consensus (e.g. a miner payout, a siafund claim, or a contract).
+// either be created by sending Bigfiles between addresses or they can be
+// created by consensus (e.g. a miner payout, a bigfund claim, or a contract).
 const (
 	EventTypeMinerPayout       = wallet.EventTypeMinerPayout
 	EventTypeFoundationSubsidy = wallet.EventTypeFoundationSubsidy
-	EventTypeSiafundClaim      = wallet.EventTypeSiafundClaim
+	EventTypeBigfundClaim      = wallet.EventTypeBigfundClaim
 
 	EventTypeV1Transaction        = wallet.EventTypeV1Transaction
 	EventTypeV1ContractResolution = wallet.EventTypeV1ContractResolution
@@ -27,11 +27,11 @@ const (
 )
 
 type (
-	// An EventPayout represents a miner payout, siafund claim, or foundation
+	// An EventPayout represents a miner payout, bigfund claim, or foundation
 	// subsidy.
 	EventPayout = wallet.EventPayout
-	// An EventV1Transaction pairs a v1 transaction with its spent siacoin and
-	// siafund elements.
+	// An EventV1Transaction pairs a v1 transaction with its spent bigfile and
+	// bigfund elements.
 	EventV1Transaction = wallet.EventV1Transaction
 	// An EventV1ContractResolution represents a file contract payout from a v1
 	// contract.
@@ -49,11 +49,11 @@ type (
 )
 
 type (
-	// Balance is a summary of a siacoin and siafund balance
+	// Balance is a summary of a bigfile and bigfund balance
 	Balance struct {
-		Siacoins         types.Currency `json:"siacoins"`
-		ImmatureSiacoins types.Currency `json:"immatureSiacoins"`
-		Siafunds         uint64         `json:"siafunds"`
+		Bigfiles         types.Currency `json:"bigfiles"`
+		ImmatureBigfiles types.Currency `json:"immatureBigfiles"`
+		Bigfunds         uint64         `json:"bigfunds"`
 	}
 
 	// An ID is a unique identifier for a wallet.
@@ -77,24 +77,24 @@ type (
 		Metadata    json.RawMessage    `json:"metadata"`
 	}
 
-	// An UnspentSiacoinElement is an unspent siacoin output paired
+	// An UnspentBigfileElement is an unspent bigfile output paired
 	// with the number of confirmations.
-	UnspentSiacoinElement struct {
-		types.SiacoinElement
+	UnspentBigfileElement struct {
+		types.BigfileElement
 		Confirmations uint64 `json:"confirmations"`
 	}
 
-	// An UnspentSiafundElement is an unspent siafund output paired
+	// An UnspentBigfundElement is an unspent bigfund output paired
 	// with the number of confirmations.
-	UnspentSiafundElement struct {
-		types.SiafundElement
+	UnspentBigfundElement struct {
+		types.BigfundElement
 		Confirmations uint64 `json:"confirmations"`
 	}
 
 	// A ChainUpdate is a set of changes to the consensus state.
 	ChainUpdate interface {
-		SiacoinElementDiffs() []consensus.SiacoinElementDiff
-		SiafundElementDiffs() []consensus.SiafundElementDiff
+		BigfileElementDiffs() []consensus.BigfileElementDiff
+		BigfundElementDiffs() []consensus.BigfundElementDiff
 		FileContractElementDiffs() []consensus.FileContractElementDiff
 		V2FileContractElementDiffs() []consensus.V2FileContractElementDiff
 	}
@@ -168,13 +168,13 @@ func AppliedEvents(cs consensus.State, b types.Block, cu ChainUpdate, relevant f
 	}
 
 	anythingRelevant := func() bool {
-		for _, sced := range cu.SiacoinElementDiffs() {
-			if relevant(sced.SiacoinElement.SiacoinOutput.Address) {
+		for _, biged := range cu.BigfileElementDiffs() {
+			if relevant(biged.BigfileElement.BigfileOutput.Address) {
 				return true
 			}
 		}
-		for _, sfed := range cu.SiafundElementDiffs() {
-			if relevant(sfed.SiafundElement.SiafundOutput.Address) {
+		for _, sfed := range cu.BigfundElementDiffs() {
+			if relevant(sfed.BigfundElement.BigfundOutput.Address) {
 				return true
 			}
 		}
@@ -185,17 +185,17 @@ func AppliedEvents(cs consensus.State, b types.Block, cu ChainUpdate, relevant f
 	}
 
 	// collect all elements
-	sces := make(map[types.SiacoinOutputID]types.SiacoinElement)
-	sfes := make(map[types.SiafundOutputID]types.SiafundElement)
-	for _, sced := range cu.SiacoinElementDiffs() {
-		sce := sced.SiacoinElement
-		sce.StateElement.MerkleProof = nil
-		sces[sce.ID] = sce
+	biges := make(map[types.BigfileOutputID]types.BigfileElement)
+	bfes := make(map[types.BigfundOutputID]types.BigfundElement)
+	for _, biged := range cu.BigfileElementDiffs() {
+		bige := biged.BigfileElement
+		bige.StateElement.MerkleProof = nil
+		biges[bige.ID] = bige
 	}
-	for _, sfed := range cu.SiafundElementDiffs() {
-		sfe := sfed.SiafundElement
-		sfe.StateElement.MerkleProof = nil
-		sfes[sfe.ID] = sfe
+	for _, sfed := range cu.BigfundElementDiffs() {
+		bfe := sfed.BigfundElement
+		bfe.StateElement.MerkleProof = nil
+		bfes[bfe.ID] = bfe
 	}
 
 	// handle v1 transactions
@@ -203,48 +203,48 @@ func AppliedEvents(cs consensus.State, b types.Block, cu ChainUpdate, relevant f
 		addresses := make(map[types.Address]bool)
 		e := &wallet.EventV1Transaction{
 			Transaction:          txn,
-			SpentSiacoinElements: make([]types.SiacoinElement, 0, len(txn.SiacoinInputs)),
-			SpentSiafundElements: make([]types.SiafundElement, 0, len(txn.SiafundInputs)),
+			SpentBigfileElements: make([]types.BigfileElement, 0, len(txn.BigfileInputs)),
+			SpentBigfundElements: make([]types.BigfundElement, 0, len(txn.BigfundInputs)),
 		}
 
-		for _, sci := range txn.SiacoinInputs {
-			sce, ok := sces[sci.ParentID]
+		for _, bigi := range txn.BigfileInputs {
+			bige, ok := biges[bigi.ParentID]
 			if !ok {
 				continue
 			}
 
-			e.SpentSiacoinElements = append(e.SpentSiacoinElements, sce)
-			if relevant(sce.SiacoinOutput.Address) {
-				addresses[sce.SiacoinOutput.Address] = true
+			e.SpentBigfileElements = append(e.SpentBigfileElements, bige)
+			if relevant(bige.BigfileOutput.Address) {
+				addresses[bige.BigfileOutput.Address] = true
 			}
 		}
-		for _, sco := range txn.SiacoinOutputs {
-			if relevant(sco.Address) {
-				addresses[sco.Address] = true
+		for _, bigo := range txn.BigfileOutputs {
+			if relevant(bigo.Address) {
+				addresses[bigo.Address] = true
 			}
 		}
 
-		for _, sfi := range txn.SiafundInputs {
-			sfe, ok := sfes[sfi.ParentID]
+		for _, bfi := range txn.BigfundInputs {
+			bfe, ok := bfes[bfi.ParentID]
 			if !ok {
 				continue
 			}
 
-			e.SpentSiafundElements = append(e.SpentSiafundElements, sfe)
-			if relevant(sfe.SiafundOutput.Address) {
-				addresses[sfe.SiafundOutput.Address] = true
+			e.SpentBigfundElements = append(e.SpentBigfundElements, bfe)
+			if relevant(bfe.BigfundOutput.Address) {
+				addresses[bfe.BigfundOutput.Address] = true
 			}
 
-			sce, ok := sces[sfi.ParentID.ClaimOutputID()]
-			if ok && relevant(sce.SiacoinOutput.Address) && !sce.SiacoinOutput.Value.IsZero() {
-				addEvent(types.Hash256(sce.ID), sce.MaturityHeight, EventTypeSiafundClaim, wallet.EventPayout{
-					SiacoinElement: sce,
-				}, []types.Address{sfi.ClaimAddress})
+			bige, ok := biges[bfi.ParentID.ClaimOutputID()]
+			if ok && relevant(bige.BigfileOutput.Address) && !bige.BigfileOutput.Value.IsZero() {
+				addEvent(types.Hash256(bige.ID), bige.MaturityHeight, EventTypeBigfundClaim, wallet.EventPayout{
+					BigfileElement: bige,
+				}, []types.Address{bfi.ClaimAddress})
 			}
 		}
-		for _, sfo := range txn.SiafundOutputs {
-			if relevant(sfo.Address) {
-				addresses[sfo.Address] = true
+		for _, bfo := range txn.BigfundOutputs {
+			if relevant(bfo.Address) {
+				addresses[bfo.Address] = true
 			}
 		}
 
@@ -264,36 +264,36 @@ func AppliedEvents(cs consensus.State, b types.Block, cu ChainUpdate, relevant f
 	// handle v2 transactions
 	for _, txn := range b.V2Transactions() {
 		addresses := make(map[types.Address]bool)
-		for _, sci := range txn.SiacoinInputs {
-			if !relevant(sci.Parent.SiacoinOutput.Address) {
+		for _, bigi := range txn.BigfileInputs {
+			if !relevant(bigi.Parent.BigfileOutput.Address) {
 				continue
 			}
-			addresses[sci.Parent.SiacoinOutput.Address] = true
+			addresses[bigi.Parent.BigfileOutput.Address] = true
 		}
-		for _, sco := range txn.SiacoinOutputs {
-			if !relevant(sco.Address) {
+		for _, bigo := range txn.BigfileOutputs {
+			if !relevant(bigo.Address) {
 				continue
 			}
-			addresses[sco.Address] = true
+			addresses[bigo.Address] = true
 		}
-		for _, sfi := range txn.SiafundInputs {
-			if !relevant(sfi.Parent.SiafundOutput.Address) {
+		for _, bfi := range txn.BigfundInputs {
+			if !relevant(bfi.Parent.BigfundOutput.Address) {
 				continue
 			}
-			addresses[sfi.Parent.SiafundOutput.Address] = true
+			addresses[bfi.Parent.BigfundOutput.Address] = true
 
-			sce, ok := sces[types.SiafundOutputID(sfi.Parent.ID).V2ClaimOutputID()]
-			if ok && relevant(sfi.ClaimAddress) && !sce.SiacoinOutput.Value.IsZero() {
-				addEvent(types.Hash256(sce.ID), sce.MaturityHeight, EventTypeSiafundClaim, wallet.EventPayout{
-					SiacoinElement: sce,
-				}, []types.Address{sfi.ClaimAddress})
+			bige, ok := biges[types.BigfundOutputID(bfi.Parent.ID).V2ClaimOutputID()]
+			if ok && relevant(bfi.ClaimAddress) && !bige.BigfileOutput.Value.IsZero() {
+				addEvent(types.Hash256(bige.ID), bige.MaturityHeight, EventTypeBigfundClaim, wallet.EventPayout{
+					BigfileElement: bige,
+				}, []types.Address{bfi.ClaimAddress})
 			}
 		}
-		for _, sco := range txn.SiafundOutputs {
-			if !relevant(sco.Address) {
+		for _, bigo := range txn.BigfundOutputs {
+			if !relevant(bigo.Address) {
 				continue
 			}
-			addresses[sco.Address] = true
+			addresses[bigo.Address] = true
 		}
 
 		// skip transactions with no relevant addresses
@@ -325,10 +325,10 @@ func AppliedEvents(cs consensus.State, b types.Block, cu ChainUpdate, relevant f
 					continue
 				}
 
-				element := sces[types.FileContractID(fce.ID).ValidOutputID(i)]
+				element := biges[types.FileContractID(fce.ID).ValidOutputID(i)]
 				addEvent(types.Hash256(element.ID), element.MaturityHeight, EventTypeV1ContractResolution, wallet.EventV1ContractResolution{
 					Parent:         fce,
-					SiacoinElement: element,
+					BigfileElement: element,
 					Missed:         false,
 				}, []types.Address{address})
 			}
@@ -339,10 +339,10 @@ func AppliedEvents(cs consensus.State, b types.Block, cu ChainUpdate, relevant f
 					continue
 				}
 
-				element := sces[types.FileContractID(fce.ID).MissedOutputID(i)]
+				element := biges[types.FileContractID(fce.ID).MissedOutputID(i)]
 				addEvent(types.Hash256(element.ID), element.MaturityHeight, EventTypeV1ContractResolution, wallet.EventV1ContractResolution{
 					Parent:         fce,
-					SiacoinElement: element,
+					BigfileElement: element,
 					Missed:         true,
 				}, []types.Address{address})
 			}
@@ -363,25 +363,25 @@ func AppliedEvents(cs consensus.State, b types.Block, cu ChainUpdate, relevant f
 		}
 
 		if relevant(fce.V2FileContract.HostOutput.Address) {
-			element := sces[types.FileContractID(fce.ID).V2HostOutputID()]
+			element := biges[types.FileContractID(fce.ID).V2HostOutputID()]
 			addEvent(types.Hash256(element.ID), element.MaturityHeight, EventTypeV2ContractResolution, wallet.EventV2ContractResolution{
 				Resolution: types.V2FileContractResolution{
 					Parent:     fce,
 					Resolution: res,
 				},
-				SiacoinElement: element,
+				BigfileElement: element,
 				Missed:         missed,
 			}, []types.Address{fce.V2FileContract.HostOutput.Address})
 		}
 
 		if relevant(fce.V2FileContract.RenterOutput.Address) {
-			element := sces[types.FileContractID(fce.ID).V2RenterOutputID()]
+			element := biges[types.FileContractID(fce.ID).V2RenterOutputID()]
 			addEvent(types.Hash256(element.ID), element.MaturityHeight, EventTypeV2ContractResolution, wallet.EventV2ContractResolution{
 				Resolution: types.V2FileContractResolution{
 					Parent:     fce,
 					Resolution: res,
 				},
-				SiacoinElement: element,
+				BigfileElement: element,
 				Missed:         missed,
 			}, []types.Address{fce.V2FileContract.RenterOutput.Address})
 		}
@@ -390,20 +390,20 @@ func AppliedEvents(cs consensus.State, b types.Block, cu ChainUpdate, relevant f
 	// handle block rewards
 	for i := range b.MinerPayouts {
 		if relevant(b.MinerPayouts[i].Address) {
-			element := sces[cs.Index.ID.MinerOutputID(i)]
+			element := biges[cs.Index.ID.MinerOutputID(i)]
 			addEvent(types.Hash256(element.ID), element.MaturityHeight, EventTypeMinerPayout, wallet.EventPayout{
-				SiacoinElement: element,
+				BigfileElement: element,
 			}, []types.Address{b.MinerPayouts[i].Address})
 		}
 	}
 
 	// handle foundation subsidy
 	if relevant(cs.FoundationManagementAddress) {
-		element, ok := sces[cs.Index.ID.FoundationOutputID()]
+		element, ok := biges[cs.Index.ID.FoundationOutputID()]
 		if ok {
 			addEvent(types.Hash256(element.ID), element.MaturityHeight, EventTypeFoundationSubsidy, wallet.EventPayout{
-				SiacoinElement: element,
-			}, []types.Address{element.SiacoinOutput.Address})
+				BigfileElement: element,
+			}, []types.Address{element.BigfileOutput.Address})
 		}
 	}
 
