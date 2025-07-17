@@ -7,7 +7,7 @@ require (
 	go.thebigfile.com/core v1.0.9
 	go.thebigfile.com/coreutils v1.0.2
 	go.thebigfile.com/jape v0.0.2
-	go.thebigfile.com/web/walletd v0.0.1
+	go.thebigfile.com/web/walletd v0.0.3
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
 	golang.org/x/term v0.32.0
