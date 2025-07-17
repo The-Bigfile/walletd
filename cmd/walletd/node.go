@@ -25,7 +25,7 @@ import (
 	"go.thebigfile.com/walletd/v2/config"
 	"go.thebigfile.com/walletd/v2/persist/sqlite"
 	"go.thebigfile.com/walletd/v2/wallet"
-	"go.thebigfile.com/web/walletd"
+	"go.sia.tech/web/walletd"
 	"go.uber.org/zap"
 	"lukechampine.com/upnp"
 )
