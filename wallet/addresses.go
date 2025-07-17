@@ -28,7 +28,7 @@ func (m *Manager) AddressBigfileOutputs(address types.Address, usePool bool, off
 
 	spent := m.poolAddressSCSpent[address]
 	var created []UnspentBigfileElement
-	for _, bige := range m.poolSCCreated {
+	for _, bige := range m.poolBIGCreated {
 		if bige.BigfileOutput.Address != address {
 			continue
 		}
@@ -59,7 +59,7 @@ func (m *Manager) AddressBigfundOutputs(address types.Address, usePool bool, off
 
 	spent := m.poolAddressSFSpent[address]
 	var created []UnspentBigfundElement
-	for _, bfe := range m.poolSFCreated {
+	for _, bfe := range m.poolBFCreated {
 		if bfe.BigfundOutput.Address != address {
 			continue
 		}

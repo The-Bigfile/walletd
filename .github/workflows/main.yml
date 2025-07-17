@@ -10,4 +10,4 @@ env:
 
 jobs:
   test:
-    uses: SiaFoundation/workflows/.github/workflows/go-test.yml@master
+    uses: The-Bigfile/workflows/.github/workflows/go-test.yml@dev

@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   publish:
-    uses: SiaFoundation/workflows/.github/workflows/go-publish.yml@master
+    uses: The-Bigfile/workflows/.github/workflows/go-publish.yml@dev
     secrets: inherit
     with:
       linux-build-args: -tags='timetzdata netgo' -trimpath -a -ldflags '-s -w -linkmode external -extldflags "-static"'
@@ -24,7 +24,7 @@ jobs:
       macos-build-args: -tags='timetzdata netgo' -trimpath -a -ldflags '-s -w'
       cgo-enabled: 1
       project: walletd
-      project-desc: "walletd: The new Sia wallet"
+      project-desc: "walletd: The new Bigfile wallet"
       version-tag: ${{ github.ref_name }}
   upload:
     if: github.event_name == 'push' && startsWith(github.ref_name, 'v')

@@ -7,7 +7,7 @@ require (
 	go.thebigfile.com/core v1.0.9
 	go.thebigfile.com/coreutils v1.0.2
 	go.thebigfile.com/jape v0.0.2
-	go.sia.tech/web/walletd v0.32.0
+	go.thebigfile.com/web/walletd v0.0.1
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842
 	golang.org/x/term v0.32.0
@@ -23,8 +23,7 @@ require (
 	github.com/quic-go/quic-go v0.53.0 // indirect
 	github.com/quic-go/webtransport-go v0.9.0 // indirect
 	go.etcd.io/bbolt v1.4.2 // indirect
-	go.sia.tech/mux v1.4.0 // indirect
-	go.sia.tech/web v0.0.0-20240610131903-5611d44a533e // indirect
+	go.thebigfile.com/mux v0.0.4 // indirect
 	go.uber.org/mock v0.5.2 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect

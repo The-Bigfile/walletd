@@ -150,10 +150,10 @@ type (
 		// tracks the state of utxos in the transaction pool
 		// this local state is used to remove a race between
 		// the wallet indexing and the chain manager
-		poolSCCreated      map[types.BigfileOutputID]types.BigfileElement
-		poolSFCreated      map[types.BigfundOutputID]types.BigfundElement
-		poolSCSpent        map[types.BigfileOutputID]bool
-		poolSFSpent        map[types.BigfundOutputID]bool
+		poolBIGCreated     map[types.BigfileOutputID]types.BigfileElement
+		poolBFCreated      map[types.BigfundOutputID]types.BigfundElement
+		poolBIGSpent       map[types.BigfileOutputID]bool
+		poolBFSpent        map[types.BigfundOutputID]bool
 		poolAddressSCSpent map[types.Address][]types.BigfileOutputID
 		poolAddressSFSpent map[types.Address][]types.BigfundOutputID
 	}
@@ -401,7 +401,7 @@ func (m *Manager) SelectBigfileElements(walletID ID, amount types.Currency, useU
 	}
 
 	var ephemeral []types.BigfileElement
-	for _, bige := range m.poolSCCreated {
+	for _, bige := range m.poolBIGCreated {
 		exists, err := relevantAddr(bige.BigfileOutput.Address)
 		if err != nil {
 			return nil, types.ChainIndex{}, types.ZeroCurrency, fmt.Errorf("failed to check if address %q is relevant: %w", bige.BigfileOutput.Address, err)
@@ -410,7 +410,7 @@ func (m *Manager) SelectBigfileElements(walletID ID, amount types.Currency, useU
 		}
 		ephemeral = append(ephemeral, bige)
 	}
-	inPool := m.poolSCSpent
+	inPool := m.poolBIGSpent
 
 	var inputSum types.Currency
 	var selected []UnspentBigfileElement
@@ -506,7 +506,7 @@ top:
 		}
 
 		for _, bfe := range utxos {
-			if m.poolSFSpent[bfe.ID] || m.utxosLocked(types.Hash256(bfe.ID)) != nil {
+			if m.poolBFSpent[bfe.ID] || m.utxosLocked(types.Hash256(bfe.ID)) != nil {
 				continue
 			}
 
@@ -619,24 +619,24 @@ func syncStore(ctx context.Context, store Store, cm ChainManager, index types.Ch
 //
 // It is expected that the caller holds the manager's lock.
 func (m *Manager) resetPool() {
-	m.poolSCCreated = make(map[types.BigfileOutputID]types.BigfileElement)
-	m.poolSCSpent = make(map[types.BigfileOutputID]bool)
+	m.poolBIGCreated = make(map[types.BigfileOutputID]types.BigfileElement)
+	m.poolBIGSpent = make(map[types.BigfileOutputID]bool)
 
-	m.poolSFCreated = make(map[types.BigfundOutputID]types.BigfundElement)
-	m.poolSFSpent = make(map[types.BigfundOutputID]bool)
+	m.poolBFCreated = make(map[types.BigfundOutputID]types.BigfundElement)
+	m.poolBFSpent = make(map[types.BigfundOutputID]bool)
 
 	m.poolAddressSCSpent = make(map[types.Address][]types.BigfileOutputID)
 	m.poolAddressSFSpent = make(map[types.Address][]types.BigfundOutputID)
 
 	for _, txn := range m.chain.PoolTransactions() {
 		for _, input := range txn.BigfileInputs {
-			m.poolSCSpent[input.ParentID] = true
+			m.poolBIGSpent[input.ParentID] = true
 			m.poolAddressSCSpent[input.UnlockConditions.UnlockHash()] = append(m.poolAddressSCSpent[input.UnlockConditions.UnlockHash()], input.ParentID)
-			delete(m.poolSCCreated, input.ParentID)
+			delete(m.poolBIGCreated, input.ParentID)
 		}
 		for i, bigo := range txn.BigfileOutputs {
 			scoid := txn.BigfileOutputID(i)
-			m.poolSCCreated[scoid] = types.BigfileElement{
+			m.poolBIGCreated[scoid] = types.BigfileElement{
 				ID:            scoid,
 				StateElement:  types.StateElement{LeafIndex: types.UnassignedLeafIndex},
 				BigfileOutput: bigo,
@@ -644,12 +644,12 @@ func (m *Manager) resetPool() {
 		}
 
 		for _, input := range txn.BigfundInputs {
-			m.poolSFSpent[input.ParentID] = true
-			delete(m.poolSFCreated, input.ParentID)
+			m.poolBFSpent[input.ParentID] = true
+			delete(m.poolBFCreated, input.ParentID)
 		}
 		for i, bfo := range txn.BigfundOutputs {
 			sfoid := txn.BigfundOutputID(i)
-			m.poolSFCreated[sfoid] = types.BigfundElement{
+			m.poolBFCreated[sfoid] = types.BigfundElement{
 				ID:            sfoid,
 				StateElement:  types.StateElement{LeafIndex: types.UnassignedLeafIndex},
 				BigfundOutput: bfo,
@@ -659,23 +659,23 @@ func (m *Manager) resetPool() {
 
 	for _, txn := range m.chain.V2PoolTransactions() {
 		for _, input := range txn.BigfileInputs {
-			m.poolSCSpent[input.Parent.ID] = true
+			m.poolBIGSpent[input.Parent.ID] = true
 			m.poolAddressSCSpent[input.Parent.BigfileOutput.Address] = append(m.poolAddressSCSpent[input.Parent.BigfileOutput.Address], input.Parent.ID)
-			delete(m.poolSCCreated, input.Parent.ID)
+			delete(m.poolBIGCreated, input.Parent.ID)
 		}
 		for i := range txn.BigfileOutputs {
 			bige := txn.EphemeralBigfileOutput(i)
-			m.poolSCCreated[bige.ID] = bige
+			m.poolBIGCreated[bige.ID] = bige
 		}
 
 		for _, input := range txn.BigfundInputs {
-			m.poolSFSpent[input.Parent.ID] = true
+			m.poolBFSpent[input.Parent.ID] = true
 			m.poolAddressSFSpent[input.Parent.BigfundOutput.Address] = append(m.poolAddressSFSpent[input.Parent.BigfundOutput.Address], input.Parent.ID)
-			delete(m.poolSFCreated, input.Parent.ID)
+			delete(m.poolBFCreated, input.Parent.ID)
 		}
 		for i := range txn.BigfundOutputs {
 			bfe := txn.EphemeralBigfundOutput(i)
-			m.poolSFCreated[bfe.ID] = bfe
+			m.poolBFCreated[bfe.ID] = bfe
 		}
 	}
 }
@@ -701,11 +701,11 @@ func NewManager(cm ChainManager, store Store, opts ...Option) (*Manager, error) 
 
 		used: make(map[types.Hash256]time.Time),
 
-		poolSCSpent:   make(map[types.BigfileOutputID]bool),
-		poolSCCreated: make(map[types.BigfileOutputID]types.BigfileElement),
+		poolBIGSpent:   make(map[types.BigfileOutputID]bool),
+		poolBIGCreated: make(map[types.BigfileOutputID]types.BigfileElement),
 
-		poolSFSpent:   make(map[types.BigfundOutputID]bool),
-		poolSFCreated: make(map[types.BigfundOutputID]types.BigfundElement),
+		poolBFSpent:   make(map[types.BigfundOutputID]bool),
+		poolBFCreated: make(map[types.BigfundOutputID]types.BigfundElement),
 
 		poolAddressSCSpent: make(map[types.Address][]types.BigfileOutputID),
 		poolAddressSFSpent: make(map[types.Address][]types.BigfundOutputID),
